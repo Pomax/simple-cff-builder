@@ -27,8 +27,6 @@ function buildFont() {
     "endchar"
   ].join(" "));
 
-  console.log(options.charString.join(", "));
-
   var font = SFNT.build(options);
   SFNT.utils.addStyleSheet(font, "customfont", "custom");
   SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
