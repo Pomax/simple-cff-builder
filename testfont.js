@@ -29,7 +29,15 @@ function buildFont() {
 
   var font = SFNT.build(options);
   SFNT.utils.addStyleSheet(font, "customfont", "custom");
+
+  // show the gsubs region in the CFF block
   SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
+
+  // add a download link for easy debugging
+  var a = document.createElement("a");
+  a.href = font.toDataURL();
+  a.textContent = "download font as .otf";
+  document.body.appendChild(a);
 }
 
 var schedule = ["sin", "cos", "rotate"];

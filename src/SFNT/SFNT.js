@@ -80,6 +80,9 @@ SFNT.prototype = {
 
     return obj;
   },
+  toDataURL: function() {
+    return utils.toDataURL("font", this);
+  },
   toData: function() {
     var self = this,
         tags = {},

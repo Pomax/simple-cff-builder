@@ -1,13 +1,10 @@
-var asChars = require("./asChars");
-var toWOFF = require("./toWOFF");
+var toDataURL = require("./toDataURL");
 
 module.exports = function addStyleSheet(font, fontFamily, className) {
   // set up the .otf and .woff rules
   fontFamily = fontFamily || "custom font";
-  var mime_otf = "font/opentype";
-  var dataurl_otf = "data:" + mime_otf + ";base64," + btoa(font.toData().map(asChars).join(''));
-  var mime_woff = "application/font-woff";
-  var dataurl_woff = "data:" + mime_woff + ";base64," + btoa(toWOFF(font).map(asChars).join(''));
+  var dataurl_otf = toDataURL("font", font);
+  var dataurl_woff = toDataURL("woff", font);
   var fontface = ["@font-face {\n  font-family: '" + fontFamily + "';"
                  , "  src: url('" +dataurl_otf+ "') format('opentype'),"
                  , "       url('" +dataurl_woff+ "') format('woff');"

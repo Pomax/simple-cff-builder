@@ -15,5 +15,6 @@ module.exports = {
   nodeBuilder: require("./nodeBuilder"),
   shimFname: require("./shimFname"),
   struct: require("./struct"),
-  toWOFF: require("./toWOFF")
+  toWOFF: require("./toWOFF"),
+  toDataURL: require("./toDataURL")
 };

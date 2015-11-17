@@ -102,6 +102,9 @@ SFNT.prototype = {
 
     return obj;
   },
+  toDataURL: function() {
+    return utils.toDataURL("font", this);
+  },
   toData: function() {
     var self = this,
         tags = {},
@@ -3014,16 +3017,13 @@ module.exports = function addMappings(container, mappings, globalOffset) {
 };
 
 },{"./getColor":75}],66:[function(require,module,exports){
-var asChars = require("./asChars");
-var toWOFF = require("./toWOFF");
+var toDataURL = require("./toDataURL");
 
 module.exports = function addStyleSheet(font, fontFamily, className) {
   // set up the .otf and .woff rules
   fontFamily = fontFamily || "custom font";
-  var mime_otf = "font/opentype";
-  var dataurl_otf = "data:" + mime_otf + ";base64," + btoa(font.toData().map(asChars).join(''));
-  var mime_woff = "application/font-woff";
-  var dataurl_woff = "data:" + mime_woff + ";base64," + btoa(toWOFF(font).map(asChars).join(''));
+  var dataurl_otf = toDataURL("font", font);
+  var dataurl_woff = toDataURL("woff", font);
   var fontface = ["@font-face {\n  font-family: '" + fontFamily + "';"
                  , "  src: url('" +dataurl_otf+ "') format('opentype'),"
                  , "       url('" +dataurl_woff+ "') format('woff');"
@@ -3048,7 +3048,7 @@ module.exports = function addStyleSheet(font, fontFamily, className) {
   document.head.appendChild(sheet);
 };
 
-},{"./asChars":67,"./toWOFF":81}],67:[function(require,module,exports){
+},{"./toDataURL":81}],67:[function(require,module,exports){
 module.exports = function asChars(v) { return String.fromCharCode(v); };
 
 },{}],68:[function(require,module,exports){
@@ -3194,7 +3194,7 @@ module.exports = function buildTables(font, context, selector, tableCaption, add
   formTables(font, hexmap, charmap, tableCaption, addDownloads);
 };
 
-},{"./asChars":67,"./asHex":69,"./toWOFF":81}],73:[function(require,module,exports){
+},{"./asChars":67,"./asHex":69,"./toWOFF":82}],73:[function(require,module,exports){
 var dataBuilding = require("./dataBuilding");
 
 var NUMBER  = dataBuilding.encoder.NUMBER;
@@ -3700,10 +3700,11 @@ module.exports = {
   nodeBuilder: require("./nodeBuilder"),
   shimFname: require("./shimFname"),
   struct: require("./struct"),
-  toWOFF: require("./toWOFF")
+  toWOFF: require("./toWOFF"),
+  toDataURL: require("./toDataURL")
 };
 
-},{"./Mapper":64,"./addMappings":65,"./addStyleSheet":66,"./asChars":67,"./asGlyphIDs":68,"./asHex":69,"./asNumbers":70,"./atou":71,"./buildTables":72,"./convertOutline":73,"./dataBuilding":74,"./getColor":75,"./makeStructy":77,"./nodeBuilder":78,"./shimFname":79,"./struct":80,"./toWOFF":81}],77:[function(require,module,exports){
+},{"./Mapper":64,"./addMappings":65,"./addStyleSheet":66,"./asChars":67,"./asGlyphIDs":68,"./asHex":69,"./asNumbers":70,"./atou":71,"./buildTables":72,"./convertOutline":73,"./dataBuilding":74,"./getColor":75,"./makeStructy":77,"./nodeBuilder":78,"./shimFname":79,"./struct":80,"./toDataURL":81,"./toWOFF":82}],77:[function(require,module,exports){
 var nodeBuilder = require("./nodeBuilder");
 
 module.exports = function makeStructy(name, array) {
@@ -4042,6 +4043,19 @@ Struct.prototype = {
 module.exports = Struct;
 
 },{"./dataBuilding":74,"./makeStructy":77,"./nodeBuilder":78}],81:[function(require,module,exports){
+var asChars = require("./asChars");
+var toWOFF = require("./toWOFF");
+
+module.exports = function toDataURL(type, font) {
+   if (type === "woff") {
+    var mime_woff = "application/font-woff";
+    return "data:" + mime_woff + ";base64," + btoa(toWOFF(font).map(asChars).join(''));
+   }
+   var mime_otf = "font/opentype";
+   return "data:" + mime_otf + ";base64," + btoa(font.toData().map(asChars).join(''));
+};
+
+},{"./asChars":67,"./toWOFF":82}],82:[function(require,module,exports){
 var struct = require("./struct");
 var dataBuilding = require("./dataBuilding");
 
