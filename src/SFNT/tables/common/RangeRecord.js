@@ -1,0 +1,19 @@
+var utils = require("../../../utils");
+var struct = utils.struct;
+
+"use strict";
+
+var RangeRecord = function(input) {
+  if(!this.parse(input) {
+    input = input || {};
+    this.fill(input);
+  }
+};
+
+RangeRecord.prototype = new struct("RangeRecord", [
+    ["start",              "GlyphID", "start of the coverage range"]
+  , ["end",                "GlyphID", "end of the coverage range"]
+  , ["StartCoverageIndex", "USHORT",  "Coverage Index of first GlyphID in range"]
+]);
+
+module.exports = RangeRecord;

@@ -1,0 +1,20 @@
+{
+  "name": "simple-cff-generator",
+  "version": "1.0.0",
+  "description": "A simple OpenType/CFF font generator",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify -e src/builder.js -o sfnt.js -s SFNT"
+  },
+  "keywords": [
+    "opentype",
+    "cff",
+    "fonts"
+  ],
+  "author": "Pomax",
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^12.0.1"
+  }
+}
