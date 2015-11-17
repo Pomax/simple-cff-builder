@@ -22,6 +22,6 @@ rotate(): // [angle, x, y, ox oy]
 12 get, 22 get, 23 get, add, add, 24 put,
 
 // restore stack as [angle, ox, oy, x', y']
-10 get, 11 get, 12 get, 23 get, 24 get,
+10 get, 11 get, 12 get, 21 get, 24 get,
 
 return

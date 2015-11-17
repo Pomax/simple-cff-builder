@@ -12,19 +12,23 @@ function buildFont() {
   };
 
   options.charString = Type2Convert.toBytes([
-    " 3.14159, 0 0, 10 0, rotate()",
+    // set up our initial [angle, ox, oy] values:
+    " 3.14159, random, mul, 350 350",
 
-    "          rmoveto",
-    "   0  700 rlineto",
-    " 700    0 rlineto",
-    "   0 -700 rlineto",
-    "-700    0 rlineto",
+    "   0    0 rotate() move()",
+    "   0  700 rotate() line()",
+    " 700    0 rotate() line()",
+    "   0 -700 rotate() line()",
+    "-700    0 rotate() line()",
 
-    " 100  100 rmoveto",
-    " 500    0 rlineto",
-    "   0  500 rlineto",
-    "-500    0 rlineto",
-    "   0 -500 rlineto",
+    " 100  100 rotate() move()",
+    " 500    0 rotate() line()",
+    "   0  500 rotate() line()",
+    "-500    0 rotate() line()",
+    "   0 -500 rotate() line()",
+
+    // clean up [angle, ox, oy]:
+    " drop, drop, drop",
 
     "endchar"
   ].join(" "));
@@ -43,7 +47,7 @@ function buildFont() {
   document.body.appendChild(a);
 }
 
-var schedule = ["sin", "cos", "rotate"];
+var schedule = ["sin", "cos", "rotate", "move", "line"];
 var pending = schedule.length;
 
 function fetch(url, onload, onerror) {
