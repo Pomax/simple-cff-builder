@@ -12,7 +12,9 @@ function buildFont() {
   };
 
   options.charString = Type2Convert.toBytes([
-    "   0    0 rmoveto",
+    " 3.14159, 0 0, 10 0, rotate()",
+
+    "          rmoveto",
     "   0  700 rlineto",
     " 700    0 rlineto",
     "   0 -700 rlineto",
@@ -37,6 +39,7 @@ function buildFont() {
   var a = document.createElement("a");
   a.href = font.toDataURL();
   a.textContent = "download font as .otf";
+  a.download = "font.otf";
   document.body.appendChild(a);
 }
 

@@ -1,1 +1,27 @@
-rotate(): 4 put, 3 put, 2 put, 1 put, 0 put, 0 get, sin(), 5 put, 0 get, cos(), 6 put, 3 get, 1 get, sub, 7 put, 4 get, 2 get, sub, 8 put, 7 get, 6 get, mul, 9 put, 8 get, 6 get, mul, 10 put, 3 get, 9 get, 10 get, neg, add, add, 11 put, 7 get, 6 get, mul, 12 put, 8 get, 5 get, mul, 13 put, 2 get, 12 get, 13 get, add, add, 14 put, get 0, get 1, get 2, get 13, get 14, return
+rotate(): // [angle, x, y, ox oy]
+
+// cache [angle, ox, oy, x, y] to the transient stack
+14 put, 13 put, 12 put, 11 put, 10 put,
+
+// cache sin(angle) and cos(angle)
+10 get, sin(), 15 put,
+10 get, cos(), 16 put,
+
+// cache (x-ox) and (y-oy)
+13 get, 11 get, sub, 17 put,
+14 get, 12 get, sub, 18 put,
+
+// compute x' = (x-ox) * cos(angle) - (y - oy) * sin(angle)
+17 get, 16 get, mul, 19 put,
+18 get, 16 get, mul, 20 put,
+13 get, 19 get, 20 get, neg, add, add, 21 put,
+
+// compute y' = (x-ox) * sin(angle) + (y - oy) * cos(angle)
+17 get, 16 get, mul, 22 put,
+18 get, 15 get, mul, 23 put,
+12 get, 22 get, 23 get, add, add, 24 put,
+
+// restore stack as [angle, ox, oy, x', y']
+10 get, 11 get, 12 get, 23 get, 24 get,
+
+return

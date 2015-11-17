@@ -1,29 +1,23 @@
-sin(): 
+sin(): // stack: [x], transient: []
 
-// dup, 
-// 0, put, 
-// 3.1415, 
-// dup, 
-// 1, put, 
-// 4, 
-// 2, put, 
-// 49.348, 
-// 3, put, 
+dup, 0, put,           // [x],          [x]
+3.14159, dup, 1, put,  // [x, 3.1415],  [x, 3.1415]
+4, 2, put,             // [x, 3.1415],  [x, 3.1415, 4]
+49.34802, 3, put,      // [x, 3.1415],  [x, 3.1415, 4, 49.348]
 
-// exch, 
-// sub, 
-// 0, get, 
-// mul, 
+exch,                  // [pi, x],      ...
+sub,                   // [pi-x],       ...
+0, get,                // [pi-x, x],    ...
+mul,                   // [x*(pi-x)],   ...
 
-// 2, get,
-// mul, 
-// 4, put, 
+2, get,                // [x(pi-x), 4], ...
+mul,                   // [4x(pi-x)],   ...
+dup, 4, put,           // [4x(pi-x)],   [x, 3.14, 4, 49.348, 4x(pi-x)]
 
-// 3, get, 
-// 4, get, 
-// sub, 
-// div, 
+3, get,                // [4x(pi-x), 49.348]
+4, get,                // [4x(pi-x), 49.348, 4x(pi-x)]
+sub,                   // [4x(pi-x), 49.348 - 4x(pi-x)]
+div,                   // [4x(pi-x) / (49.348 - 4x(pi-x))]
 
-// 2, get, 
-// mul, 
+2, get, mul,          // [4 * fraction]
 return

@@ -1,1 +1,3 @@
-cos(): 1.57 add, sin(), return 
+cos(): // stack: [x]
+
+1.57 add, sin(), return
