@@ -12,23 +12,17 @@ function buildFont() {
   };
 
   options.charString = Type2Convert.toBytes([
-    // set up our initial [angle, ox, oy] values:
-    " 3.14159, random, mul, 350 350",
+    "   0    0 rmoveto",
+    "   0  700 rlineto",
+    " 700    0 rlineto",
+    "   0 -700 rlineto",
+    "-700    0 rlineto",
 
-    "   0    0 rotate() move()",
-    "   0  700 rotate() line()",
-    " 700    0 rotate() line()",
-    "   0 -700 rotate() line()",
-    "-700    0 rotate() line()",
-
-    " 100  100 rotate() move()",
-    " 500    0 rotate() line()",
-    "   0  500 rotate() line()",
-    "-500    0 rotate() line()",
-    "   0 -500 rotate() line()",
-
-    // clean up [angle, ox, oy]:
-    " drop, drop, drop",
+    " 100  100 rmoveto",
+    " 500    0 rlineto",
+    "   0  500 rlineto",
+    "-500    0 rlineto",
+    "   0 -500 rlineto",
 
     "endchar"
   ].join(" "));
