@@ -1,27 +1,62 @@
-rotate(): // [angle, x, y, ox oy]
+rotate(): // [angle, ox, oy, x, y]
 
-// cache [angle, ox, oy, x, y] to the transient stack
-14 put, 13 put, 12 put, 11 put, 10 put,
+	// first, we rearrange the stack and form sin() and cos()
+	// for the angle provided. As those are the only two
+	// subroutines we rely on, once we do that, the transient
+	// stack is freely manipulable.
 
-// cache sin(angle) and cos(angle)
-10 get, sin(), 15 put,
-10 get, cos(), 16 put,
+	// reorder stack => [ox, oy, x, y, angle]
+	5 -1 roll
 
-// cache (x-ox) and (y-oy)
-13 get, 11 get, sub, 17 put,
-14 get, 12 get, sub, 18 put,
+	// extend stack => [ox, oy, x, y, angle, angle, angle]
+	dup, dup
 
-// compute x' = (x-ox) * cos(angle) - (y - oy) * sin(angle)
-17 get, 16 get, mul, 19 put,
-18 get, 16 get, mul, 20 put,
-13 get, 19 get, 20 get, neg, add, add, 21 put,
+	// perform trig => [ox, oy, x, y, angle, sin(angle), cos(angle)]
+	sin()
+	exch
+	cos()
 
-// compute y' = (x-ox) * sin(angle) + (y - oy) * cos(angle)
-17 get, 16 get, mul, 22 put,
-18 get, 15 get, mul, 23 put,
-12 get, 22 get, 23 get, add, add, 24 put,
+	// We can now safely cache the values we need for later:
 
-// restore stack as [angle, ox, oy, x', y']
-10 get, 11 get, 12 get, 21 get, 24 get,
+	4 put                        // cos(angle)
+	3 put                        // sin(angle)
+	0 put                        // angle
+
+	// in order to cache ox and oy we need to reorder [ox, oy, x, y] to [x, y, ox, oy]
+	4 2 roll
+	2 put                        // oy
+	1 put                        // ox
+
+	// This leaves [x, y] on the stack, which we transform
+	// into the (x-ox) and (y-oy) values we'll need:
+
+	2 get, exch, sub, 6 put      // y-oy
+	1 get, exch, sub, 5 put      // x-ox
+
+
+	// At this point the main stack is empty, and we can form x':
+
+	4 get, 5 get, mul, 7 put,    // cos(angle) * (x-ox)
+	3 get, 6 get, mul, 8 put,    // sin(angle) * (y-oy)
+
+	1 get,                       // ox +
+	  7 get,                     // cos(angle) * (x-ox)
+	  8 get, neg                 // -sin(angle) * (y-oy)
+	  add,                       // =
+	add, 9 put,                  // x'
+
+	// And then y':
+
+	3 get, 5 get, mul, 10 put,   // sin(angle) * (x-ox)
+	4 get, 6 get, mul, 11 put,   // cos(angle) * (y-oy)
+
+	2 get,                       // oy +
+	  10 get,                    // sin(angle) * (x-ox) +
+	  11 get,                    // cos(angle) * (y-oy)
+	  add,                       // =
+	add, 12 put,                 // y'
+
+	// restore stack as [angle, ox, oy, x', y']
+	0 get, 1 get, 2 get, 9 get, 12 get,
 
 return

@@ -6,7 +6,8 @@ var convertOutline = utils.convertOutline;
 module.exports = function(options) {
 
   // ensure we have all the necessary globals
-  var glyphCode = "~".charCodeAt(0);
+  var glyphName = options.glyphName || "~";
+  var glyphCode = glyphName.charCodeAt(0);
   var globals = {
       outline: options.outline || ""
     , charString: options.charString || false
@@ -19,7 +20,7 @@ module.exports = function(options) {
     , copyright: options.copyright || "License-free"
     , trademark: options.trademark || "Trademark-free"
     , license: options.license || "License-free"
-    , glyphName: options.glyphName || "~"
+    , glyphName: glyphName
     , glyphCode: glyphCode
     , quadSize: options.quadSize || 1024
     , label: options.label || false
@@ -27,7 +28,7 @@ module.exports = function(options) {
     , minimal: options.minimal !== "undefined" ? options.minimal : false
     , compliant: options.compliant !== "undefined" ? options.compliant : true
     , letters: (function(globals, glyphCode) {
-        var letters = ["~"];
+        var letters = [glyphName];
         if(globals.label) {
           letters = [];
           globals.label.split('').forEach(function(l) {

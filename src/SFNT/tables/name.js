@@ -90,7 +90,7 @@ name.prototype.setStrings = function(globals) {
     if(globals.license        !== undefined)  this.set(13, globals.license);
     // NameID 19 is for the "preview text" in font preview utilities. Since we're
     // only implementing a single glyph, that's the entire preview string.
-    this.set(19, "~");
+    this.set(19, globals.glyphName);
   }
   this.finalise();
 }

@@ -1,0 +1,22 @@
+#
+#   Implementation of sin() for interval [0,1]
+#
+
+sin1(): // [x]
+
+  // => [x, (1-x)]
+  dup, 1, exch, sub
+
+  // => [4x(1-x)]
+  mul, 4, mul
+
+  // => [4x(1-x), 5 - 4x(1-x)]
+  dup, 5, exch, sub
+
+  // => [4x(1-x) / 5 - 4x(1-x)]
+  div
+
+  // => [4 * ...]
+  4, mul
+
+return

@@ -1,48 +1,70 @@
 "use strict";
 
+var customFunctions = [
+    "sin-1"
+  , "sin-2"
+  , "sin"
+  , "cos"
+  , "rotate-linear"
+  , "move"
+  , "line"
+];
+
 function buildFont() {
   var options = {
-    xMin: 0,
-    yMin: 0,
-    xMax: 700,
-    yMax: 700,
-    label: "custom",
+    xMin: -100,
+    yMin: -100,
+    xMax: 800,
+    yMax: 800,
+    glyphName: "A",
+    label: false,
     minimal: false,
     subroutines: Type2Convert.getSubroutines()
   };
 
-  options.charString = Type2Convert.toBytes([
-    "   0    0 rmoveto",
-    "   0  700 rlineto",
-    " 700    0 rlineto",
-    "   0 -700 rlineto",
-    "-700    0 rlineto",
+  options.charString = [].concat(
+    Type2Convert.toBytes([
+      // rotation angle
+      "0.25 random mul",
 
-    " 100  100 rmoveto",
-    " 500    0 rlineto",
-    "   0  500 rlineto",
-    "-500    0 rlineto",
-    "   0 -500 rlineto",
+      // rotation origin
+      "0 0", 
 
-    "endchar"
-  ].join(" "));
+      // rotated 700/700 box
+      "    0    0 rotate() move()",
+      "    0  700 rotate() line()",
+      "  700    0 rotate() line()",
+      "    0 -700 rotate() line()",
+      " -700    0 rotate() line()",
+
+      "  100  100 rotate() move()",
+      "  500    0 rotate() line()",
+      "    0  500 rotate() line()",
+      " -500    0 rotate() line()",
+      "    0 -500 rotate() line()",
+
+      // cleanup angle and origin
+      " drop drop drop",
+
+      "endchar"
+    ].join(" "))
+  );
+
+  console.log(options.charString);
 
   var font = SFNT.build(options);
-  SFNT.utils.addStyleSheet(font, "customfont", "custom");
 
   // show the gsubs region in the CFF block
   SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
 
-  // add a download link for easy debugging
-  var a = document.createElement("a");
-  a.href = font.toDataURL();
-  a.textContent = "download font as .otf";
-  a.download = "font.otf";
-  document.body.appendChild(a);
-}
+  // build CSS stylesheet
+  SFNT.utils.addStyleSheet(font, "customfont", "custom");
 
-var schedule = ["sin", "cos", "rotate", "move", "line"];
-var pending = schedule.length;
+  // add a download link for easy debugging
+  var a = document.getElementById("download");
+  a.href = font.toDataURL();
+  a.download = "font.otf";
+}
 
 function fetch(url, onload, onerror) {
   var xhr = new XMLHttpRequest();
@@ -56,20 +78,25 @@ function fetch(url, onload, onerror) {
 
 function handleSheet(response) {
   var parts = response.split("\n")
-                      .map(function(f) { return f.replace(/\/\/.*$/,'').trim(); })
+                      .map(function(f) {
+                        return f.replace(/\/\/.*$/,'')
+                                .replace(/#.*$/,'')
+                                .trim();
+                      })
                       .filter(function(f) { return !!f; })
                       .join(" ")
                       .split(":")
                       .map(function(f) { return f.trim(); });
   var name = parts[0];
-    var bytes = Type2Convert.toBytes(parts[1]);
-    Type2Convert.bindSubroutine(name, bytes);
-    pending--;
-    if (pending===0) {
-      buildFont();
-    }
+  var bytes = Type2Convert.toBytes(parts[1]);
+  Type2Convert.bindSubroutine(name, bytes);
+  handleSheets();
 }
 
-schedule.forEach(function(thing) {
-  fetch('./subroutines/program.'+thing+'.type2', handleSheet);
-});
+function handleSheets() {
+  if (customFunctions.length === 0) return buildFont();
+  var thing = customFunctions.splice(0,1)[0];
+  fetch('./subroutines/program.'+thing+'.type2', handleSheet);  
+};
+
+handleSheets();

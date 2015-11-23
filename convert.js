@@ -69,6 +69,12 @@ var gsubs = {
 // recomputed eevery time the global subroutines are requested
 var gsubsBias = 0;
 
+var specials = {
+	"subr_index": "INDEX",
+	"subr_op": ops.callsubr,
+	"gsubr_op": ops.callgsubr,
+}
+
 /**
  * [convertInteger description]
  * @param  {[type]} v [description]
@@ -102,14 +108,16 @@ function convertInteger(v) {
  * @param  {[type]} v [description]
  * @return {[type]}   [description]
  */
+// we need to avoid rounding errors, so we need to "cut off" the integer as
+// string, instead of using arithmetics. Using maths, 3.1415 - 3 becomes the
+// rather cumbersome 0.14150000000000018, instead of 0.1415, for instance.
 function convertFloat(v) {
     var integer = v|0 ;
-	// we need to avoid rounding errors, so we need to "cut off" the integer as
-	// string, instead of using arithmetics. Using maths, 3.1415 - 3 becomes the
-	// rather cumbersome 0.14150000000000018, instead of 0.1415, for instance.
 	var pos = v.indexOf('.');
     v = v.substring(pos + 1);
-    var fraction = parseInt(v);
+    // encode the fraction in terms of how many 1/65535ths is closest
+    var tail = parseFloat("0." + v);
+    var fraction = Math.round(tail * 65535) | 0;
     return [255, (integer & 0xFF00) >> 8, integer & 0xFF, (fraction & 0xFF00) >> 8, fraction & 0xFF];
 }
 
@@ -122,6 +130,8 @@ function convertOperator(v) {
 	if (ops[v]) return ops[v];
 	if (escops[v]) return [12, escops[v]];
 	if (gsubs[v]) return [convertInteger(Object.keys(gsubs).indexOf(v) - gsubsBias), 29];
+	// special ops for global and local subroutine op codes/indices only
+	if (specials[v]) return [specials[v]];
 	throw new Error("unknown operator [" + v + "]");
 }
 
@@ -202,13 +212,23 @@ module.exports = {
 		var lines = input.split(/\r?\n/)
 		                .map(l => {
 		                 	return l.replace(/\/\/.*$/,'')
+		                 	        .replace(/#.*$/,'')
 		                 	        .replace(/,/g,' ')
 		                 	        .trim();
 		                })
 		                .filter(l => !!l)
 		                .join(' ');
 		var data = lines.split(/\s+/);
-		return flatten(data.map(toType2));
+		var bytes = flatten(data.map(toType2));
+
+		do {
+			var pos = bytes.indexOf(specials["subr_index"]);
+			if (pos > -1) {
+				// remove the INDEX marker, and the preceding subroutine operator
+				bytes.splice(pos-1, 2);
+			}
+		} while (pos > -1);
+		return bytes;
 	},
 
 	toString: function(byte, subroutines) {

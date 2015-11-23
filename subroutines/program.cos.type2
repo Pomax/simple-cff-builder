@@ -1,3 +1,10 @@
-cos(): // stack: [x]
+#
+#   This function relies on the [0,1] version of 
+#   the Bhaskara I's method of approximating sin(x)
+#   and uses this to determin cos(x) as sin(x + 0.5)
 
-1.57 add, sin(), return
+cos():
+
+  0.5, add, sin()
+
+return

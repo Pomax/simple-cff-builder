@@ -1,23 +1,35 @@
-sin(): // stack: [x], transient: []
+#
+#   This implements the Bhaskara I's method of approximating
+#   a circle using the function:
+# 
+#                   4x(a-x)
+#   sin(x) = 4 * ---------------
+#                5*a^2 - 4x(1-x)
+#
+#   where the constant 'a' is a circle - circumference value.
+# 
+#   Normally, this is the value pi, but it's actually easier
+#   to work with a circle that has half unit 1, instead, thus
+#   giving us the less-rounding-sensitive function:
+# 
+#                  4x(1-x)
+#   sin(x) = 4 * -----------
+#                5 - 4x(1-x)
+#
 
-dup, 0, put,           // [x],          [x]
-3.14159, dup, 1, put,  // [x, 3.1415],  [x, 3.1415]
-4, 2, put,             // [x, 3.1415],  [x, 3.1415, 4]
-49.34802, 3, put,      // [x, 3.1415],  [x, 3.1415, 4, 49.348]
+sin(): // [x]
 
-exch,                  // [pi, x],      ...
-sub,                   // [pi-x],       ...
-0, get,                // [pi-x, x],    ...
-mul,                   // [x*(pi-x)],   ...
 
-2, get,                // [x(pi-x), 4], ...
-mul,                   // [4x(pi-x)],   ...
-dup, 4, put,           // [4x(pi-x)],   [x, 3.14, 4, 49.348, 4x(pi-x)]
+#  // => add the gsubr indices for the sin1 and sin2 routines
+#  sin1() subr_index,
+#  sin2() subr_index,
+#
+#  // rearrange to [sin1, sin2, x, 1]
+#  3 -1 roll, 1
+#
+#  // jump based on 'x' value
+#  ifelse, gsubr_op
 
-3, get,                // [4x(pi-x), 49.348]
-4, get,                // [4x(pi-x), 49.348, 4x(pi-x)]
-sub,                   // [4x(pi-x), 49.348 - 4x(pi-x)]
-div,                   // [4x(pi-x) / (49.348 - 4x(pi-x))]
+  sin1() // ifelse is rather broken atm, so we simply only ever use [0,1] for now
 
-2, get, mul,          // [4 * fraction]
 return
