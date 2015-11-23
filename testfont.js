@@ -1,11 +1,9 @@
 "use strict";
 
 var customFunctions = [
-    "sin-1"
-  , "sin-2"
-  , "sin"
+    "sin"
   , "cos"
-  , "rotate-linear"
+  , "rotate"
   , "move"
   , "line"
 ];
@@ -24,28 +22,29 @@ function buildFont() {
 
   options.charString = [].concat(
     Type2Convert.toBytes([
+/*
       // rotation angle
-      "0.25 random mul",
-
+      "0.15",
       // rotation origin
-      "0 0", 
+      "0 0",
+*/
 
       // rotated 700/700 box
-      "    0    0 rotate() move()",
-      "    0  700 rotate() line()",
-      "  700    0 rotate() line()",
-      "    0 -700 rotate() line()",
-      " -700    0 rotate() line()",
+      "    0    0 rmoveto",
+      "    0  700 rlineto",
+      "  700    0 rlineto",
+      "    0 -700 rlineto",
+      " -700    0 rlineto",
 
-      "  100  100 rotate() move()",
-      "  500    0 rotate() line()",
-      "    0  500 rotate() line()",
-      " -500    0 rotate() line()",
-      "    0 -500 rotate() line()",
-
+      "  100  100 rmoveto",
+      "  500    0 rlineto",
+      "    0  500 rlineto",
+      " -500    0 rlineto",
+      "    0 -500 rlineto",
+/*
       // cleanup angle and origin
       " drop drop drop",
-
+*/
       "endchar"
     ].join(" "))
   );
@@ -69,9 +68,8 @@ function buildFont() {
 function fetch(url, onload, onerror) {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", url, false);
-  xhr.onload = function() {
-    onload(xhr.response);
-  };
+  xhr.overrideMimeType("text/plain; charset=x-user-defined");
+  xhr.onload = function() { onload(xhr.response); };
   xhr.onerror = onerror;
   xhr.send(null);
 }
@@ -96,7 +94,7 @@ function handleSheet(response) {
 function handleSheets() {
   if (customFunctions.length === 0) return buildFont();
   var thing = customFunctions.splice(0,1)[0];
-  fetch('./subroutines/program.'+thing+'.type2', handleSheet);  
+  fetch('./subroutines/program.'+thing+'.type2', handleSheet);
 };
 
 handleSheets();

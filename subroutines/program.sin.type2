@@ -1,35 +1,41 @@
 #
 #   This implements the Bhaskara I's method of approximating
 #   a circle using the function:
-# 
+#
 #                   4x(a-x)
 #   sin(x) = 4 * ---------------
 #                5*a^2 - 4x(1-x)
 #
 #   where the constant 'a' is a circle - circumference value.
-# 
+#
 #   Normally, this is the value pi, but it's actually easier
 #   to work with a circle that has half unit 1, instead, thus
 #   giving us the less-rounding-sensitive function:
-# 
+#
 #                  4x(1-x)
 #   sin(x) = 4 * -----------
 #                5 - 4x(1-x)
 #
+#
+#
+#   Limitations: currently implementation for interval [0,1]
+#
 
 sin(): // [x]
 
+  // => [x, (1-x)]
+  dup, 1, exch, sub
 
-#  // => add the gsubr indices for the sin1 and sin2 routines
-#  sin1() subr_index,
-#  sin2() subr_index,
-#
-#  // rearrange to [sin1, sin2, x, 1]
-#  3 -1 roll, 1
-#
-#  // jump based on 'x' value
-#  ifelse, gsubr_op
+  // => [4x(1-x)]
+  mul, 4, mul
 
-  sin1() // ifelse is rather broken atm, so we simply only ever use [0,1] for now
+  // => [4x(1-x), 5 - 4x(1-x)]
+  dup, 5, exch, sub
+
+  // => [4x(1-x) / 5 - 4x(1-x)]
+  div
+
+  // => [4 * ...]
+  4, mul
 
 return
