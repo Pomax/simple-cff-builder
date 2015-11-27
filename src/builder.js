@@ -5,7 +5,7 @@ var formGlobals = require('./formGlobals');
 var utils = require('./utils');
 var asChars = utils.asChars;
 var asGlyphIDs = utils.asGlyphIDs;
-var addLabelSubstitution = require("./SFNT/tables/common/GSUB/addLabelSubstitution");
+var addLabelSubstitution = require("./utils/addLabelSubstitution");
 
 module.exports = {
   utils: utils,

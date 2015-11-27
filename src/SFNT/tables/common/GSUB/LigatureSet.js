@@ -28,17 +28,23 @@ LigatureSet.prototype.addLigatureTable = function(options) {
 
 LigatureSet.prototype.finalise = function() {
   var ligatures = [],
+      llen = 0,
       offsets = [];
   this.LigatureCount = this.tables.length;
-  this.tables.forEach(function(v) {
-    offsets.push(ligatures.length);
+// console.log("pre:", offsets.slice(), llen);
+  this.tables.forEach(function(v,idx) {
     v.finalise();
     ligatures.push(v);
+    offsets.push(llen);
+// console.log("during:", offsets.slice(), llen);
+    llen += v.sizeOf();
   });
+// console.log("post:", offsets.slice(), llen);
   this.Ligatures = ligatures;
   offsets = offsets.map(function(v) {
     return v + 2 + 2*offsets.length;
   });
+// console.log("mapped:", offsets.slice(), llen);
   var data = []
   offsets.forEach(function(v) {
     data = data.concat(dataBuilding.encoder.USHORT(v));

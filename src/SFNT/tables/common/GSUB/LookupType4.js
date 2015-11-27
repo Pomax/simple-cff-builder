@@ -60,6 +60,9 @@ LookupType4.prototype.finalise = function() {
   });
   this.LigatureSetTables = ligaturesets;
   this.LigatureSetOffsets = offsets;
+
+  console.log(JSON.stringify(this.toJSON(), false, 2));
+  console.log(this.toData().join(','));
 };
 
 module.exports = LookupType4;

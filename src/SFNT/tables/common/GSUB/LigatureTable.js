@@ -11,6 +11,7 @@ var LigatureTable = function(input) {
     input.CompCount = 1 + input.Components.length;
     this.fill(input);
   }
+  console.log(input);
 };
 
 LigatureTable.prototype = new struct("LigatureTable", [

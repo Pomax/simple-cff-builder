@@ -15,15 +15,19 @@ hmtx.prototype = new struct("hmtx table", [
   ["hMetrics", "LITERAL", "the array of horizontal metrics for the glyphs in this font"]
 ]);
 
+hmtx.prototype.createMetric = function(advanceWidth, lsb) {
+  return new LongHorMetric({ advanceWidth: advanceWidth , lsb: lsb });
+};
+
 hmtx.prototype.build = function(globals, numberOfHMetrics) {
   var data = []
+  var advanceWidth = (globals.xMax - globals.xMin);
+  var lsb = globals.xMin;
+  // FIXME: retrieve these valkues by examining globals.charstrings
   for(var i=0; i < numberOfHMetrics - 1; i++) {
-    data.push(new LongHorMetric({ advanceWidth: 0, lsb: 0 }));
+    data.push(this.createMetric(advanceWidth, lsb));
   }
-  data.push(new LongHorMetric({
-    advanceWidth: globals.xMax - globals.xMin,
-    lsb: globals.xMin
-  }));
+  data.push(this.createMetric(advanceWidth, lsb));
   this.hMetrics = data;
 };
 

@@ -13,12 +13,7 @@ var CoverageFormat1 = function(input) {
     input = {
       CoverageFormat: 1,
       GlyphCount: input.length,
-      GlyphArray: (function() {
-                    var data = [];
-                    input.forEach(function(v) {
-                      data = data.concat(dataBuilding.encoder.GlyphID(v));
-                    });
-                  }())
+      GlyphArray: input.map(function(v) { return dataBuilding.encoder.GlyphID(v); })
     };
     this.fill(input);
   }

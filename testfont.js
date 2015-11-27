@@ -41,12 +41,12 @@ function buildFont() {
   /**
    * And let's add two ligatures, because we can.
    */
-  cmap["alphabet"] = charstring(["default"]);
-  cmap["rectangle"] = charstring(["default"]);
+  cmap["a"] = charstring(["default"]);
+  cmap["r"] = charstring(["default"]);
 
   var GSUB = {
-//    "A,B,C": "alphabet",  // FIXME: adding more than one substitution doesn't work right now.
-    "R,E,C,T,A,N,G,L,E": "rectangle"
+    "A,B,C": "a",
+    "R,E,C,T,A,N,G,L,E": "r"
   };
 
   var options = {

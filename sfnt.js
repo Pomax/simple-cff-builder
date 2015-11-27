@@ -6,7 +6,7 @@ var formGlobals = require('./formGlobals');
 var utils = require('./utils');
 var asChars = utils.asChars;
 var asGlyphIDs = utils.asGlyphIDs;
-var addLabelSubstitution = require("./SFNT/tables/common/GSUB/addLabelSubstitution");
+var addLabelSubstitution = require("./utils/addLabelSubstitution");
 
 module.exports = {
   utils: utils,
@@ -149,7 +149,7 @@ module.exports = {
   }
 };
 
-},{"./SFNT/SFNT":3,"./SFNT/tables/common/GSUB/addLabelSubstitution":45,"./formGlobals":63,"./utils":76}],2:[function(require,module,exports){
+},{"./SFNT/SFNT":3,"./formGlobals":62,"./utils":76,"./utils/addLabelSubstitution":64}],2:[function(require,module,exports){
 var struct = require("../utils").struct;
 
 "use strict";
@@ -432,7 +432,7 @@ module.exports = {
   BASE: require("./tables/BASE")
 };
 
-},{"./tables/BASE":6,"./tables/CFF_":7,"./tables/GDEF":8,"./tables/GPOS":9,"./tables/GSUB":10,"./tables/JSTF":11,"./tables/OS_2":12,"./tables/cmap":24,"./tables/head":53,"./tables/hhea":54,"./tables/hmtx":55,"./tables/maxp":57,"./tables/name":58,"./tables/post":62}],6:[function(require,module,exports){
+},{"./tables/BASE":6,"./tables/CFF_":7,"./tables/GDEF":8,"./tables/GPOS":9,"./tables/GSUB":10,"./tables/JSTF":11,"./tables/OS_2":12,"./tables/cmap":24,"./tables/head":52,"./tables/hhea":53,"./tables/hmtx":54,"./tables/maxp":56,"./tables/name":57,"./tables/post":61}],6:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -692,7 +692,7 @@ GSUB.prototype.finalise = function() {
 
 module.exports = GSUB;
 
-},{"../../utils":76,"./common/FeatureList":39,"./common/LangSysTable":47,"./common/LookupList":48,"./common/ScriptList":50}],11:[function(require,module,exports){
+},{"../../utils":76,"./common/FeatureList":39,"./common/LangSysTable":46,"./common/LookupList":47,"./common/ScriptList":49}],11:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -1584,12 +1584,7 @@ var CoverageFormat1 = function(input) {
     input = {
       CoverageFormat: 1,
       GlyphCount: input.length,
-      GlyphArray: (function() {
-                    var data = [];
-                    input.forEach(function(v) {
-                      data = data.concat(dataBuilding.encoder.GlyphID(v));
-                    });
-                  }())
+      GlyphArray: input.map(function(v) { return dataBuilding.encoder.GlyphID(v); })
     };
     this.fill(input);
   }
@@ -1799,17 +1794,23 @@ LigatureSet.prototype.addLigatureTable = function(options) {
 
 LigatureSet.prototype.finalise = function() {
   var ligatures = [],
+      llen = 0,
       offsets = [];
   this.LigatureCount = this.tables.length;
-  this.tables.forEach(function(v) {
-    offsets.push(ligatures.length);
+// console.log("pre:", offsets.slice(), llen);
+  this.tables.forEach(function(v,idx) {
     v.finalise();
     ligatures.push(v);
+    offsets.push(llen);
+// console.log("during:", offsets.slice(), llen);
+    llen += v.sizeOf();
   });
+// console.log("post:", offsets.slice(), llen);
   this.Ligatures = ligatures;
   offsets = offsets.map(function(v) {
     return v + 2 + 2*offsets.length;
   });
+// console.log("mapped:", offsets.slice(), llen);
   var data = []
   offsets.forEach(function(v) {
     data = data.concat(dataBuilding.encoder.USHORT(v));
@@ -1833,6 +1834,7 @@ var LigatureTable = function(input) {
     input.CompCount = 1 + input.Components.length;
     this.fill(input);
   }
+  console.log(input);
 };
 
 LigatureTable.prototype = new struct("LigatureTable", [
@@ -1914,134 +1916,19 @@ LookupType4.prototype.finalise = function() {
   });
   this.LigatureSetTables = ligaturesets;
   this.LigatureSetOffsets = offsets;
+
+  console.log(JSON.stringify(this.toJSON(), false, 2));
+  console.log(this.toData().join(','));
 };
 
 module.exports = LookupType4;
 
 },{"../../../../utils":76,"../CoverageFormat":38,"./LigatureSet":42}],45:[function(require,module,exports){
-/**
- * Substitution tables are hilariously complex, due to OpenType's concept
- * of scripts, language systems, features, and lookups.
- *
- * Lookups and Features live on "heaps", with features being instructions
- * to transform one or more letters somehow, and lookups being specific
- * algorithms for performing those transforms.
- *
- * Features generally have a fixed list of lookups they might point to,
- * but (in part because there can be multiple features that do the same
- * thing, roughly) a lookup can be used by more than one feature. As
- * such, the feature:lookup relation is many-to-many.
- *
- * Scripts and language systems are a way to deal with the complexity
- * of the real world. A script models a particular writing system
- * (latin, arabic, japanese, etc, as well as the special "default")
- * and this writing system may or may not apply to more than one
- * language (latin, for instance, can be french, english, turkish,
- * vietnamese, and so on).
- *
- * As each of these language systems have different rules when it comes
- * to combining accents, forming ligatures, applying punctuation, and
- * more such things, different language systems have different feature
- * requirements, although some languages will share certain features.
- * (for instance, how to align basic punctuation like commas and full
- * stops).
- *
- * So, the language:feature relation, too, is manu-to-many.
- *
- * Finally, the script:language relation is one-to-many.
- *
- */
-module.exports = function addLabelSubstitution(font, globals) {
-
-    // step 1: add a ligature lookup. This takes a bit of work.
-    //         Also note this is now just a "loose" lookup on
-    //         the heap of lookups.
-
-
-    // step 1a: in order to set up a "multiple letters become one letter"
-    //          substitution, we need to create a GSUB "type 4" lookup, which
-    //          models the "many-to-one substitution" effect.
-    var lookup = font.GSUB.addLookup({ LookupType: 4 });
-
-
-    // step 1b: In order to define a substitution lookup, we need to
-    //          list all the letters for which substitutions are going
-    //          to be necessary. If we're going to substitute "fl" with
-    //          something, as well as "etc" with something, this coverage
-    //          list would be ['e', 'f'], for instance.
-    var substitutions = Object.keys(globals.substitutions);
-    var primaries = substitutions.map(function(v) { return (v.split(','))[0]; });
-    primaries = primaries.filter(function(e,pos) {
-        return primaries.indexOf(e) === pos;
-    }).map(function(e) {
-        return globals.letters.indexOf(e) + 1; // offset added to account for .notdef
-    });
-
-    var subtable = lookup.addSubTable();
-    subtable.addCoverage(primaries);
-
-
-    // step 1c: substitutions use ligature sets.
-    var ligatureSet = subtable.addLigatureSet();
-
-
-    // step 1d: because the ligature sets go in the ligature table: the bit
-    //          that, ultimately, does the work for us.
-    substitutions.forEach(function(key) {
-        var glyphs = key.split(',');
-
-        // the single glyph we want to end up with:
-        var target = globals.substitutions[key];
-
-        //  its corresponding glyph ID:
-        var LigGlyph = globals.letters.indexOf(target) + 1; // offset to account for .notdef
-
-        //  the sequence of glyphs that will trigger this substitution,
-        //  *without* the first one, which is already specified in the
-        //  coverage table, so we don't need to repeat it here:
-        var Components = glyphs.slice(1).map(function(v) {
-            return globals.letters.indexOf(v) + 1; // offset to account for .notdef
-        });
-
-        ligatureSet.addLigatureTable({
-          LigGlyph: LigGlyph,
-          Components: Components
-        });
-    });
-
-
-    // step 2: wrap this ligature lookup with a ligature feature. This feature
-    //         is also just a "loose" feature on the heap of features.
-
-    var feature = font.GSUB.addFeature({ FeatureTag: "liga", lookups: [lookup] });
-
-
-    // step 3: Now we need to say which language systems this features
-    //         is actually used by. We just go with a single language
-    //         system, because we only need one...
-
-    var langSysTable = font.GSUB.makeLangSys({ features: [feature] });
-
-
-    // step 4: And then we say which scripts our language system applies to.
-    //         In this case we use the default (=DFLT) script, as well as
-    //         the latin (=latn) script, because our font uses ascii.
-    //         And yes: this is extremely graphy.
-
-    font.GSUB.addScript({ ScriptTag: "DFLT", LangSysTables: [langSysTable] });
-    font.GSUB.addScript({ ScriptTag: "latn", LangSysTables: [langSysTable] });
-
-
-    // Now, wasn't that fun? Step last: make all these bindings stick.
-    font.GSUB.finalise();
-};
-
-},{}],46:[function(require,module,exports){
 module.exports = {
  	"4": require("./LookupType4")
 };
 
-},{"./LookupType4":44}],47:[function(require,module,exports){
+},{"./LookupType4":44}],46:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -2080,7 +1967,7 @@ LangSysTable.prototype.finalise = function() {
 
 module.exports = LangSysTable;
 
-},{"../../../utils":76}],48:[function(require,module,exports){
+},{"../../../utils":76}],47:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -2125,7 +2012,7 @@ LookupList.prototype.finalise = function() {
 
 module.exports = LookupList;
 
-},{"../../../utils":76,"./LookupTable":49}],49:[function(require,module,exports){
+},{"../../../utils":76,"./LookupTable":48}],48:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -2179,7 +2066,7 @@ LookupTable.prototype.finalise = function(idx) {
 
 module.exports = LookupTable;
 
-},{"../../../utils":76,"./GSUB/lookups":46}],50:[function(require,module,exports){
+},{"../../../utils":76,"./GSUB/lookups":45}],49:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var ScriptRecord = require("./ScriptRecord");
@@ -2262,7 +2149,7 @@ ScriptList.prototype.finalise = function() {
 
 module.exports = ScriptList;
 
-},{"../../../utils":76,"./ScriptRecord":51,"./ScriptTable":52}],51:[function(require,module,exports){
+},{"../../../utils":76,"./ScriptRecord":50,"./ScriptTable":51}],50:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2283,7 +2170,7 @@ ScriptRecord.prototype = new struct("ScriptRecord", [
 
 module.exports = ScriptRecord;
 
-},{"../../../utils":76}],52:[function(require,module,exports){
+},{"../../../utils":76}],51:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2321,7 +2208,7 @@ ScriptTable.prototype.finalise = function(lookups) {
 
 module.exports = ScriptTable;
 
-},{"../../../utils":76}],53:[function(require,module,exports){
+},{"../../../utils":76}],52:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2370,7 +2257,7 @@ head.prototype = new struct("head table", [
 
 module.exports = head;
 
-},{"../../utils":76}],54:[function(require,module,exports){
+},{"../../utils":76}],53:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2413,7 +2300,7 @@ hhea.prototype = new struct("hhea table", [
 
 module.exports = hhea;
 
-},{"../../utils":76}],55:[function(require,module,exports){
+},{"../../utils":76}],54:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 var LongHorMetric = require("./hmtx/LongHorMetric");
@@ -2431,21 +2318,25 @@ hmtx.prototype = new struct("hmtx table", [
   ["hMetrics", "LITERAL", "the array of horizontal metrics for the glyphs in this font"]
 ]);
 
+hmtx.prototype.createMetric = function(advanceWidth, lsb) {
+  return new LongHorMetric({ advanceWidth: advanceWidth , lsb: lsb });
+};
+
 hmtx.prototype.build = function(globals, numberOfHMetrics) {
   var data = []
+  var advanceWidth = (globals.xMax - globals.xMin);
+  var lsb = globals.xMin;
+  // FIXME: retrieve these valkues by examining globals.charstrings
   for(var i=0; i < numberOfHMetrics - 1; i++) {
-    data.push(new LongHorMetric({ advanceWidth: 0, lsb: 0 }));
+    data.push(this.createMetric(advanceWidth, lsb));
   }
-  data.push(new LongHorMetric({
-    advanceWidth: globals.xMax - globals.xMin,
-    lsb: globals.xMin
-  }));
+  data.push(this.createMetric(advanceWidth, lsb));
   this.hMetrics = data;
 };
 
 module.exports = hmtx;
 
-},{"../../utils":76,"./hmtx/LongHorMetric":56}],56:[function(require,module,exports){
+},{"../../utils":76,"./hmtx/LongHorMetric":55}],55:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2471,7 +2362,7 @@ LongHorMetric.prototype = new struct("LongHorMetric", [
 
 module.exports = LongHorMetric;
 
-},{"../../../utils":76}],57:[function(require,module,exports){
+},{"../../../utils":76}],56:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2512,7 +2403,7 @@ maxp.prototype = new struct("maxp table", [
 
 module.exports = maxp;
 
-},{"../../utils":76}],58:[function(require,module,exports){
+},{"../../utils":76}],57:[function(require,module,exports){
 /**
  * Name table
  */
@@ -2624,7 +2515,7 @@ name.prototype.finalise = function() {
 
 module.exports = name;
 
-},{"../../utils":76,"./name/NameRecords":60}],59:[function(require,module,exports){
+},{"../../utils":76,"./name/NameRecords":59}],58:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2654,7 +2545,7 @@ NameRecord.prototype = new struct("NameRecord", [
 
 module.exports = NameRecord;
 
-},{"../../../utils":76}],60:[function(require,module,exports){
+},{"../../../utils":76}],59:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var NameRecord = require("./NameRecord");
@@ -2716,7 +2607,7 @@ NameRecords.prototype.finalise = function() {
 
 module.exports = NameRecords;
 
-},{"../../../utils":76,"./NameRecord":59,"./StringRecord":61}],61:[function(require,module,exports){
+},{"../../../utils":76,"./NameRecord":58,"./StringRecord":60}],60:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var atou = utils.atou;
@@ -2742,7 +2633,7 @@ StringRecord.prototype = new struct("StringRecord", [
 
 module.exports = StringRecord;
 
-},{"../../../utils":76}],62:[function(require,module,exports){
+},{"../../../utils":76}],61:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2778,7 +2669,7 @@ post.prototype = new struct("post table", [
 
 module.exports = post;
 
-},{"../../utils":76}],63:[function(require,module,exports){
+},{"../../utils":76}],62:[function(require,module,exports){
 var utils = require('./utils');
 
 "use strict";
@@ -2822,7 +2713,7 @@ module.exports = function(options) {
 
 	return globals;
 };
-},{"./utils":76}],64:[function(require,module,exports){
+},{"./utils":76}],63:[function(require,module,exports){
 "use strict";
 
 var Mapper = function() {
@@ -2866,6 +2757,123 @@ Mapper.prototype = {
 };
 
 module.exports = Mapper;
+
+},{}],64:[function(require,module,exports){
+/**
+ * Substitution tables are hilariously complex, due to OpenType's concept
+ * of scripts, language systems, features, and lookups.
+ *
+ * Lookups and Features live on "heaps", with features being instructions
+ * to transform one or more letters somehow, and lookups being specific
+ * algorithms for performing those transforms.
+ *
+ * Features generally have a fixed list of lookups they might point to,
+ * but (in part because there can be multiple features that do the same
+ * thing, roughly) a lookup can be used by more than one feature. As
+ * such, the feature:lookup relation is many-to-many.
+ *
+ * Scripts and language systems are a way to deal with the complexity
+ * of the real world. A script models a particular writing system
+ * (latin, arabic, japanese, etc, as well as the special "default")
+ * and this writing system may or may not apply to more than one
+ * language (latin, for instance, can be french, english, turkish,
+ * vietnamese, and so on).
+ *
+ * As each of these language systems have different rules when it comes
+ * to combining accents, forming ligatures, applying punctuation, and
+ * more such things, different language systems have different feature
+ * requirements, although some languages will share certain features.
+ * (for instance, how to align basic punctuation like commas and full
+ * stops).
+ *
+ * So, the language:feature relation, too, is manu-to-many.
+ *
+ * Finally, the script:language relation is one-to-many.
+ *
+ */
+module.exports = function addLabelSubstitution(font, globals) {
+
+    // step 1: add a ligature lookup. This takes a bit of work.
+    //         Also note this is now just a "loose" lookup on
+    //         the heap of lookups.
+
+
+    // step 1a: in order to set up a "multiple letters become one letter"
+    //          substitution, we need to create a GSUB "type 4" lookup, which
+    //          models the "many-to-one substitution" effect.
+    var lookup = font.GSUB.addLookup({ LookupType: 4 });
+    var subtable = lookup.addSubTable();
+
+    // step 1b: In order to define a substitution lookup, we need to
+    //          list all the letters for which substitutions are going
+    //          to be necessary. If we're going to substitute "fl" with
+    //          something, as well as "etc" with something, this coverage
+    //          list would be ['e', 'f'], for instance.
+    var substitutions = Object.keys(globals.substitutions);
+
+    var initials = substitutions.map(function(v) { return (v.split(','))[0]; });
+    initials = initials.filter(function(e,pos) {
+        return initials.indexOf(e) === pos;
+    }).map(function(e) {
+        return globals.letters.indexOf(e) + 1; // offset added to account for .notdef
+    });
+
+    subtable.addCoverage(initials);
+
+
+    // step 1c: substitutions use ligature sets, because the ligature sets
+    //          go in the ligature table: the bit that, ultimately, does
+    //          the work for us.
+    var ligatureSet = subtable.addLigatureSet();
+
+
+    // step 1d: add the actual ligatures we'll be using to the set.
+    substitutions.forEach(function(key) {
+        var glyphs = key.split(',');
+
+        // the single glyph we want to end up with:
+        var target = globals.substitutions[key];
+
+        //  Its corresponding glyph ID:
+        var LigGlyph = globals.letters.indexOf(target) + 1; // offset to account for .notdef
+
+        //  The sequence of glyphs that will trigger this substitution,
+        //  *without* the first one, which is already specified in the
+        //  coverage table, so we don't need to repeat it here:
+        var Components = glyphs.slice(1).map(function(v) {
+            return globals.letters.indexOf(v) + 1; // offset to account for .notdef
+        });
+
+        // The ligature table payload:
+        var data = { LigGlyph: LigGlyph, Components: Components };
+
+        // And finally, we can create this ligature's table entry
+        ligatureSet.addLigatureTable(data);
+    });
+
+    // step 2: wrap this ligature lookup up in a ligature feature. Much like lookups,
+    //         features are just "loose" entries on a heap of features.
+
+    var feature = font.GSUB.addFeature({ FeatureTag: "liga", lookups: [lookup] });
+
+
+    // step 3: Now we need to say which language systems this feature
+    //         is actually used by. We just go with a single language
+    //         system, because we only need one.
+
+    var langSysTable = font.GSUB.makeLangSys({ features: [feature] });
+
+
+    // step 4: Finally, we say which real world scripts our language system applies to.
+    font.GSUB.addScript({ ScriptTag: "DFLT", LangSysTables: [langSysTable] });
+    font.GSUB.addScript({ ScriptTag: "latn", LangSysTables: [langSysTable] });
+
+
+    // Now, wasn't that fun? Step last: make all these bindings stick.
+    font.GSUB.finalise();
+
+    console.log(font.GSUB.toData().join(','));
+};
 
 },{}],65:[function(require,module,exports){
 var getColor = require("./getColor");
@@ -3708,7 +3716,7 @@ module.exports = {
   toDataURL: require("./toDataURL")
 };
 
-},{"./Mapper":64,"./addMappings":65,"./addStyleSheet":66,"./asChars":67,"./asGlyphIDs":68,"./asHex":69,"./asNumbers":70,"./atou":71,"./buildTables":72,"./convertOutline":73,"./dataBuilding":74,"./getColor":75,"./makeStructy":77,"./nodeBuilder":78,"./shimFname":79,"./struct":80,"./toDataURL":81,"./toWOFF":82}],77:[function(require,module,exports){
+},{"./Mapper":63,"./addMappings":65,"./addStyleSheet":66,"./asChars":67,"./asGlyphIDs":68,"./asHex":69,"./asNumbers":70,"./atou":71,"./buildTables":72,"./convertOutline":73,"./dataBuilding":74,"./getColor":75,"./makeStructy":77,"./nodeBuilder":78,"./shimFname":79,"./struct":80,"./toDataURL":81,"./toWOFF":82}],77:[function(require,module,exports){
 var nodeBuilder = require("./nodeBuilder");
 
 module.exports = function makeStructy(name, array) {
@@ -3770,47 +3778,49 @@ module.exports = function makeStructy(name, array) {
 };
 
 },{"./nodeBuilder":78}],78:[function(require,module,exports){
-if(typeof document !== undefined) {
-  return {
-    create: function(t) {
-      return document.createElement(t);
-    }
+var builder = {
+  create: function(t) {
+    return document.createElement(t);
+  }
+};
+
+if(typeof document === "undefined") {
+  builder = {
+  	create: function(nodename) {
+      return {
+        localName: nodename.toLowerCase(),
+        attributes: {},
+        children: [],
+        appendChild: function(child) {
+          children.push(child);
+        },
+        setAttribute: function(name, value) {
+          attributes[name] = value;
+        },
+        getAttribute: function(name) {
+          return attributes[name];
+        },
+        toString: function() {
+          var attr = this.attributes,
+              keys = Object.keys(attr);
+          return "<" + this.localName + (function() {
+            var data = keys.map(function(a) {
+              return a + '="' + attr[a] + '"';
+            });
+            return data.join(" ");
+          }()) + ">" + children.map(function(v) {
+            return v.toString();
+          }).join('') + "</" + this.localName + ">";
+        },
+        valueOf: function() {
+          return this.toString();
+        }
+      }
+  	}
   };
 }
 
-module.exports = {
-	create: function(nodename) {
-    return {
-      localName: nodename.toLowerCase(),
-      attributes: {},
-      children: [],
-      appendChild: function(child) {
-        children.push(child);
-      },
-      setAttribute: function(name, value) {
-        attributes[name] = value;
-      },
-      getAttribute: function(name) {
-        return attributes[name];
-      },
-      toString: function() {
-        var attr = this.attributes,
-            keys = Object.keys(attr);
-        return "<" + this.localName + (function() {
-          var data = keys.map(function(a) {
-            return a + '="' + attr[a] + '"';
-          });
-          return data.join(" ");
-        }()) + ">" + children.map(function(v) {
-          return v.toString();
-        }).join('') + "</" + this.localName + ">";
-      },
-      valueOf: function() {
-        return this.toString();
-      }
-    }
-	}
-};
+module.exports = builder;
 
 },{}],79:[function(require,module,exports){
 /**
