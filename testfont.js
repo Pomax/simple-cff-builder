@@ -26,51 +26,53 @@ var charstring = function(arr) {
  * ...
  */
 function buildFont() {
-  // get the global subroutines, fixing the bias to its true value
-  var globalSubroutines = Type2Convert.getSubroutines();
+  // Get the global subroutines, fixing the bias to its true value.
+  // This must be done before forming "real" charstrings for each letter.
+  var subroutines = Type2Convert.getSubroutines();
 
-  /**
-   * Let's support A through Z for now. Without outlines.
-   */
-  var cmap = {};
+  // Let's support A through Z for now. Without outlines.
+  var charstrings = {};
   var first = 0x41, last = 0x5A;
   for (var i=first; i<last; i++) {
-    cmap[String.fromCharCode(i)] = charstring(["endchar"]);
+    charstrings[String.fromCharCode(i)] = charstring(["endchar"]);
   }
 
-  /**
-   * And let's add two ligatures, because we can.
-   */
-  cmap["a"] = charstring(["default"]);
-  cmap["r"] = charstring(["default"]);
+  // And let's add two ligatures, because we can.
+  // First, the targets:
+  charstrings["alphabet"] = charstring(["default"]);
+  charstrings["rectangle"] = charstring(["default"]);
 
-  var GSUB = {
-    "A,B,C": "a",
-    "R,E,C,T,A,N,G,L,E": "r"
+  // And then, the substitution rules:
+  var substitutions = {
+    "A,B,C": "alphabet",
+    "R,E,C,T,A,N,G,L,E": "rectangle"
   };
 
+  // For now we hardcode the font's bbox, but we could also just
+  // run through all the charstrings for that information, instead.
   var options = {
     xMin: 0,
     yMin: 0,
     xMax: 700,
     yMax: 700,
-    charstrings: cmap,
-    subroutines: globalSubroutines,
-    substitutions: GSUB
+    charstrings: charstrings,
+    subroutines: subroutines,
+    substitutions: substitutions
   };
 
+  // Right: build that font!
   var font = SFNT.build(options);
 
-  // show the gsubs region in the CFF block
+  // Show the gsubrs region in the CFF block:
   SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
 
-  // show the gsubs region in the CFF block
+  // Show the OpenType GSUB table:
   SFNT.utils.buildTables(font.stub["GSUB"], window, "#gsub", false, false, false, true);
 
-  // build CSS stylesheet
+  // Build a CSS stylesheet that loads the font as base64-encoded WOFF resource:
   SFNT.utils.addStyleSheet(font, "customfont", "custom");
 
-  // add a download link for easy debugging
+  // And add a download link for easy debugging, for good measure.
   var a = document.getElementById("download");
   a.href = font.toDataURL();
   a.download = "font.otf";
