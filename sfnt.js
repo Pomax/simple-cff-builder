@@ -1834,7 +1834,6 @@ var LigatureTable = function(input) {
     input.CompCount = 1 + input.Components.length;
     this.fill(input);
   }
-  console.log(input);
 };
 
 LigatureTable.prototype = new struct("LigatureTable", [
@@ -1916,9 +1915,6 @@ LookupType4.prototype.finalise = function() {
   });
   this.LigatureSetTables = ligaturesets;
   this.LigatureSetOffsets = offsets;
-
-  console.log(JSON.stringify(this.toJSON(), false, 2));
-  console.log(this.toData().join(','));
 };
 
 module.exports = LookupType4;
@@ -2811,25 +2807,37 @@ module.exports = function addLabelSubstitution(font, globals) {
     //          list would be ['e', 'f'], for instance.
     var substitutions = Object.keys(globals.substitutions);
 
+    // Construct the list of initial glyphs, which we need in order to know
+    // how many LigatureSets we're building.
     var initials = substitutions.map(function(v) { return (v.split(','))[0]; });
     initials = initials.filter(function(e,pos) {
         return initials.indexOf(e) === pos;
-    }).map(function(e) {
-        return globals.letters.indexOf(e) + 1; // offset added to account for .notdef
     });
 
-    subtable.addCoverage(initials);
+    // Then, construct the same list, but then as glyph IDs, which we need to
+    // construct the coverage table:
+    var initialIDs = initials.map(function(e) {
+        // offset added to account for .notdef
+        return globals.letters.indexOf(e) + 1;
+    });
+    subtable.addCoverage(initialIDs);
 
-
-    // step 1c: substitutions use ligature sets, because the ligature sets
-    //          go in the ligature table: the bit that, ultimately, does
-    //          the work for us.
-    var ligatureSet = subtable.addLigatureSet();
-
+    // step 1c: Construct the LigatureSets that we're going to need to store
+    //          all the substitution rules that share the same first glyph:
+    ligatureSets = {};
+    initials.sort().forEach(function(mark) {
+        ligatureSets[mark] = subtable.addLigatureSet();
+    });
 
     // step 1d: add the actual ligatures we'll be using to the set.
     substitutions.forEach(function(key) {
         var glyphs = key.split(',');
+
+        // the start glyph, which identifies the LigatureSet
+        var mark = glyphs[0];
+
+        // the ligature set we need to work with for this substitution:
+        var ligatureSet = ligatureSets[mark];
 
         // the single glyph we want to end up with:
         var target = globals.substitutions[key];
@@ -2871,8 +2879,6 @@ module.exports = function addLabelSubstitution(font, globals) {
 
     // Now, wasn't that fun? Step last: make all these bindings stick.
     font.GSUB.finalise();
-
-    console.log(font.GSUB.toData().join(','));
 };
 
 },{}],65:[function(require,module,exports){
