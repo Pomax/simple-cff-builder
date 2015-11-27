@@ -1,55 +1,63 @@
 "use strict";
 
+
+/**
+ * ...
+ */
 var customFunctions = [
-    "sin"
+    "default"
+  , "sin"
   , "cos"
   , "rotate"
   , "move"
   , "line"
 ];
 
+
+/**
+ * A simple utility function for forming charstrings
+ */
+var charstring = function(arr) {
+  return Type2Convert.toBytes(arr.join(" "));
+}
+
+
+/**
+ * ...
+ */
 function buildFont() {
-  var options = {
-    xMin: -100,
-    yMin: -100,
-    xMax: 800,
-    yMax: 800,
-    glyphName: "A",
-    label: false,
-    minimal: false,
-    subroutines: Type2Convert.getSubroutines()
+  // get the global subroutines, fixing the bias to its true value
+  var globalSubroutines = Type2Convert.getSubroutines();
+
+  /**
+   * Let's support A through Z for now. Without outlines.
+   */
+  var cmap = {};
+  var first = 0x41, last = 0x5A;
+  for (var i=first; i<last; i++) {
+    cmap[String.fromCharCode(i)] = charstring(["endchar"]);
+  }
+
+  /**
+   * And let's add two ligatures, because we can.
+   */
+  cmap["alphabet"] = charstring(["default"]);
+  cmap["rectangle"] = charstring(["default"]);
+
+  var GSUB = {
+//    "A,B,C": "alphabet",  // FIXME: adding more than one substitution doesn't work right now.
+    "R,E,C,T,A,N,G,L,E": "rectangle"
   };
 
-  options.charString = [].concat(
-    Type2Convert.toBytes([
-/*
-      // rotation angle
-      "0.15",
-      // rotation origin
-      "0 0",
-*/
-
-      // rotated 700/700 box
-      "    0    0 rmoveto",
-      "    0  700 rlineto",
-      "  700    0 rlineto",
-      "    0 -700 rlineto",
-      " -700    0 rlineto",
-
-      "  100  100 rmoveto",
-      "  500    0 rlineto",
-      "    0  500 rlineto",
-      " -500    0 rlineto",
-      "    0 -500 rlineto",
-/*
-      // cleanup angle and origin
-      " drop drop drop",
-*/
-      "endchar"
-    ].join(" "))
-  );
-
-  console.log(options.charString);
+  var options = {
+    xMin: 0,
+    yMin: 0,
+    xMax: 700,
+    yMax: 700,
+    charstrings: cmap,
+    subroutines: globalSubroutines,
+    substitutions: GSUB
+  };
 
   var font = SFNT.build(options);
 
@@ -65,6 +73,10 @@ function buildFont() {
   a.download = "font.otf";
 }
 
+
+/**
+ * ...
+ */
 function fetch(url, onload, onerror) {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", url, false);
@@ -74,6 +86,10 @@ function fetch(url, onload, onerror) {
   xhr.send(null);
 }
 
+
+/**
+ * ...
+ */
 function handleSheet(response) {
   var parts = response.split("\n")
                       .map(function(f) {
@@ -91,10 +107,16 @@ function handleSheet(response) {
   handleSheets();
 }
 
+/**
+ * ...
+ */
 function handleSheets() {
   if (customFunctions.length === 0) return buildFont();
   var thing = customFunctions.splice(0,1)[0];
   fetch('./subroutines/program.'+thing+'.type2', handleSheet);
 };
 
+/**
+ * ...
+ */
 handleSheets();

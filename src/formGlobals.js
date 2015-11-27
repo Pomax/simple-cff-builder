@@ -1,56 +1,43 @@
 var utils = require('./utils');
-var convertOutline = utils.convertOutline;
 
 "use strict";
 
 module.exports = function(options) {
+  var defaultQuad = 1024;
 
-  // ensure we have all the necessary globals
-  var glyphName = options.glyphName || "~";
-  var glyphCode = glyphName.charCodeAt(0);
   var globals = {
-      outline: options.outline || ""
-    , charString: options.charString || false
-    , vendorId: " =) "
+      minimal: options.minimal !== "undefined" ? options.minimal : false
+    , compliant: options.compliant !== "undefined" ? options.compliant : true
+
+    // builder metadata
+    , quadSize: options.quadSize || defaultQuad
+    , identifier: options.identifier || "-"
+
+    // GSUB magic?
+    , substitutions: options.substitutions || false
+
+    // Name table information
     , fontFamily: options.fontFamily || "Custom"
     , subFamily: options.subFamily || "Regular"
     , fontName: options.fontName || "Custom Glyph Font"
     , postscriptName: options.postscriptName || "customfont"
     , fontVersion: options.fontVersion || "Version 1.0"
-    , copyright: options.copyright || "License-free"
-    , trademark: options.trademark || "Trademark-free"
-    , license: options.license || "License-free"
-    , glyphName: glyphName
-    , glyphCode: glyphCode
-    , quadSize: options.quadSize || 1024
-    , label: options.label || false
-    , identifier: options.identifier || "-"
-    , minimal: options.minimal !== "undefined" ? options.minimal : false
-    , compliant: options.compliant !== "undefined" ? options.compliant : true
-    , letters: (function(globals, glyphCode) {
-        var letters = [glyphName];
-        if(globals.label) {
-          letters = [];
-          globals.label.split('').forEach(function(l) {
-            if(letters.indexOf(l) === -1) {
-              letters.push(l);
-            }
-          });
-          letters.push(String.fromCharCode(glyphCode));
-          letters.sort();
-        }
-        return letters;
-      }(options, glyphCode))
-    , subroutines: options.subroutines,
-    xMin: options.xMin || false,
-    yMin: options.yMin || false,
-    xMax: options.xMax || false,
-    yMax: options.yMax || false
-  };
+    , copyright: options.copyright || "Free of copyright"
+    , trademark: options.trademark || "Free of trademarks"
+    , license: options.license || "License free"
+    , vendorId: " =) "
 
-  // Turn the SVG outline into a charstring,
-  // and ensure correct bounding values.
-  globals.charString = convertOutline(globals);
+    // cmap/charstring information
+    , letters: Object.keys(options.charstrings || {}).sort()
+    , charstrings: options.charstrings
+    , subroutines: options.subroutines
+
+    // font master bounding box
+    , xMin: options.xMin || 0
+    , yMin: options.yMin || 0
+    , xMax: options.xMax || defaultQuad
+    , yMax: options.yMax || defaultQuad
+  };
 
 	return globals;
 };

@@ -73,7 +73,7 @@ var CFF = function(input) {
     var globalSubroutines = new SubroutineIndex();
     this["global subroutines"] = globalSubroutines;
 
-    // bind some global subroutines, if we have them.
+    // bind user-supplied global subroutines, if we have them.
     if (input.subroutines) {
       var routines = Object.keys(input.subroutines);
       routines.forEach(function(name, pos) {
@@ -88,7 +88,7 @@ var CFF = function(input) {
     var encoding = new Encoding(input);
     this["encoding"] = encoding;
 
-    var charStringIndex = new CharStringIndex(input.letters, input.charString);
+    var charStringIndex = new CharStringIndex(input.letters, input.charstrings);
     this["charstring index"] = charStringIndex;
 
     var privateDict = new PrivateDict({
@@ -105,13 +105,13 @@ var CFF = function(input) {
         "version":     stringIndex.getStringId(input.fontVersion)
       , "FullName":    stringIndex.getStringId(input.fontName)
       , "FamilyName":  stringIndex.getStringId(input.fontFamily)
-      , "Weight":      389     // one of the 390 default strings in the CFF string catalog
+      , "Weight":      389     // CFF-predefined string "Roman"
       , "UniqueID":    1       // really this just has to be 'anything'
       , "FontBBox":    [input.xMin, input.yMin, input.xMax, input.yMax]
       , "charset":     0       // placeholder for offset to charset block, from the beginning of the CFF file
       , "Encoding":    0       //          "   "            encoding block               "    "
       , "CharStrings": 0       //          "   "            charstrings block            "    "
-      , "Private":     [0, 0]  // sizeof + "   "            private dict block           "    "
+      , "Private":     [0, 0]  // sizeof,  "   "            private dict block           "    "
     });
     this["top dict index"] = topDictIndex;
 

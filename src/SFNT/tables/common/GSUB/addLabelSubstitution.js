@@ -36,27 +36,28 @@ module.exports = function addLabelSubstitution(font, globals) {
     //         Also note this is now just a "loose" lookup on
     //         the heap of lookups.
 
-    var inputs = globals.letters.slice();
-    inputs.splice(0,1);
-    inputs.splice(inputs.length-1,1);
-
 
     // step 1a: in order to set up a "multiple letters become one letter"
     //          substitution, we need to create a GSUB "type 4" lookup, which
     //          models the "many-to-one substitution" effect.
     var lookup = font.GSUB.addLookup({ LookupType: 4 });
-    var subtable = lookup.addSubTable();
 
 
     // step 1b: In order to define a substitution lookup, we need to
     //          list all the letters for which substitutions are going
     //          to be necessary. If we're going to substitute "fl" with
     //          something, as well as "etc" with something, this coverage
-    //          list would be ['e', 'f'], for instance. We're only
-    //          substituting "custom", so our list is just ['c'].
-    subtable.addCoverage([
-      globals.letters.indexOf(globals.label[0]) + 1 // offset for .notdef
-    ]);
+    //          list would be ['e', 'f'], for instance.
+    var substitutions = Object.keys(globals.substitutions);
+    var primaries = substitutions.map(function(v) { return (v.split(','))[0]; });
+    primaries = primaries.filter(function(e,pos) {
+        return primaries.indexOf(e) === pos;
+    }).map(function(e) {
+        return globals.letters.indexOf(e) + 1; // offset added to account for .notdef
+    });
+
+    var subtable = lookup.addSubTable();
+    subtable.addCoverage(primaries);
 
 
     // step 1c: substitutions use ligature sets.
@@ -65,13 +66,26 @@ module.exports = function addLabelSubstitution(font, globals) {
 
     // step 1d: because the ligature sets go in the ligature table: the bit
     //          that, ultimately, does the work for us.
-    var ligatureTable = ligatureSet.addLigatureTable({
-      LigGlyph: globals.letters.length,
-      Components: globals.label.split('').slice(1).map(function(v) {
-                    return globals.letters.indexOf(v) + 1;
-                  })
-                  // We don't need letters[0] because the coverage table will
-                  // imply the first letter in the ligature
+    substitutions.forEach(function(key) {
+        var glyphs = key.split(',');
+
+        // the single glyph we want to end up with:
+        var target = globals.substitutions[key];
+
+        //  its corresponding glyph ID:
+        var LigGlyph = globals.letters.indexOf(target) + 1; // offset to account for .notdef
+
+        //  the sequence of glyphs that will trigger this substitution,
+        //  *without* the first one, which is already specified in the
+        //  coverage table, so we don't need to repeat it here:
+        var Components = glyphs.slice(1).map(function(v) {
+            return globals.letters.indexOf(v) + 1; // offset to account for .notdef
+        });
+
+        ligatureSet.addLigatureTable({
+          LigGlyph: LigGlyph,
+          Components: Components
+        });
     });
 
 

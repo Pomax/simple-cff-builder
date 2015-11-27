@@ -5,20 +5,20 @@ var dataBuilding = require("../../../utils").dataBuilding;
 
 var encode = dataBuilding.encoder.CHARARRAY;
 
-var CharStringIndex = function(letters, charString) {
+var CharStringIndex = function(letters, charstrings) {
   var self = this;
   INDEX.call(this);
   this.setName("CharStringIndex");
-  // .notdef
+
+  // The .notdef character - for simplicity,
+  // this has no outline at all.
   this.addItem(dataBuilding.encoder.OPERAND(14));
-  // all letters except the "real" letters
+
+  // Real letters
   letters.forEach(function(letter, idx) {
-    if(idx < letters.length - 1) {
-      self.addItem(dataBuilding.encoder.OPERAND(14));
-    }
+    self.addItem(charstrings[letter]);
   });
-  // and then our true glyph
-  this.addItem(charString);
+
   this.finalise();
 }
 

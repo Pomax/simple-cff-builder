@@ -1,4 +1,155 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.SFNT = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+"use strict";
+
+var SFNT = require('./SFNT/SFNT');
+var formGlobals = require('./formGlobals');
+var utils = require('./utils');
+var asChars = utils.asChars;
+var asGlyphIDs = utils.asGlyphIDs;
+var addLabelSubstitution = require("./SFNT/tables/common/GSUB/addLabelSubstitution");
+
+module.exports = {
+  utils: utils,
+
+  build: function (options) {
+    var sfnt = new SFNT();
+    var font = sfnt.stub;
+    var globals = formGlobals(options);
+
+    /**
+     * Font header
+     */
+    font.head = new font.head({
+      unitsPerEM: globals.quadSize,
+      xMin: globals.xMin,
+      yMin: globals.yMin,
+      xMax: globals.xMax,
+      yMax: globals.yMax,
+    });
+
+
+    /**
+     * Horizontal metrics header table
+     */
+    font.hhea = new font.hhea({
+      Ascender: globals.quadSize + globals.yMin,
+      Descender: -(globals.quadSize - globals.yMax),
+      advanceWidthMax: globals.xMax - globals.xMin,
+      xMaxExtent: globals.xMax - globals.xMin,
+      numberOfHMetrics: globals.letters ? 1 + globals.letters.length : 2
+    });
+
+
+    /**
+     * Horizontal metrics table
+     */
+    font.hmtx = new font.hmtx(globals, font.hhea.numberOfHMetrics);
+
+
+    /**
+     * Max profiles - CFF does not use these, which we indicate by
+     * using a table version 0.5
+     */
+    font.maxp = new font.maxp({
+      version: 0x00005000,
+      numGlyphs: globals.letters ? 1 + globals.letters.length : 2
+    });
+
+
+    /**
+     * The name table
+     *
+     * - to have a font be windows installable, we need strings 1, 2, 3, and 6.
+     * - to have a font be OSX installable, we need strings 1, 2, 3, 4, 5, and 6.
+     * - to have a font be webfont-usable, we just need strings 1 and 2.
+     *
+     * (OTS may be patched at some point to not even check the name table at
+     *  all, at which point we don't have to bother generating it for webfonts)
+     */
+    font.name = new font.name(globals);
+
+
+    /**
+     * The OS/2 table
+     */
+    font["OS/2"] = new font["OS/2"]({
+      // we use version 3, so we can pass Microsoft's "Font Validator"
+      version: 0x0003,
+      // we implement part of the basic latin unicode block
+      // FIXME: this should be based on the globals.letters list
+      ulUnicodeRange1: 0x00000001,
+      achVendID: globals.vendorId,
+      usFirstCharIndex: globals.label ? globals.letters[0].charCodeAt(0) : globals.glyphCode,
+      usLastCharIndex: globals.glyphCode,
+      // vertical metrics: see http://typophile.com/node/13081 for how the hell these work.
+      // (short version: they don't, it's an amazing mess)
+      sTypoAscender: globals.yMax,
+      sTypoDescender: globals.yMin,
+      sTypoLineGap: globals.quadSize - globals.yMax + globals.yMin,
+      usWinAscent: globals.quadSize + globals.yMin,
+      usWinDescent: (globals.quadSize - globals.yMax),
+      // we implement part of the latin1 codepage
+      // FIXME: this should also be based on the globals.letters list
+      ulCodePageRange1: 0x00000001,
+      // we have no break char, but we must point to a "not .notdef" glyphid to
+      // validate as "legal font". Normally this would be the 'space' glyphid.
+      usBreakChar: globals.glyphCode,
+      // We have plain + ligature use, therefore the max length of
+      // all contexts are simply the length of our substitution label,
+      // if we have one, or otherwise zero.
+      usMaxContext: globals.substitutions !== false ? Object.keys(globals.substitutions).length : 0
+    });
+
+
+    /**
+     * The post table -- this table should not be necessary for
+     * webfonts, but for now must be included for the font to be legal.
+     */
+    font.post = new font.post();
+
+
+    /**
+     * The character map for this font, using a cmap
+     * format 4 subtable for our implemented glyphs.
+     */
+    font.cmap = new font.cmap({ version: 0 });
+    font.cmap.addTable({ format: 4, letters: globals.letters });
+    font.cmap.finalise();
+
+
+    /**
+     * The CFF table for this font. This is, ironically,
+     * the actual font, rather than a million different
+     * bits of metadata *about* the font and its glyphs.
+     *
+     * It's also the most complex bit (closely followed
+     * by the GSUB table for ligature substitution), which
+     * is why the CFF table isn't actually a struct, but
+     * a somewhat different bytecode generator.
+     *
+     * It works, it just works a little different from
+     * everything else.
+     */
+    font["CFF "] = new font["CFF "](globals);
+
+
+    /**
+     * Finally, if there were  "substitutions", we need some GSUB
+     * magic. Note: this stuff is complex. Like, properly, which
+     * is why it's wrapped by a function, rather than being a simple
+     * few constructor options. Seriously, GSUB is voodoo black magic.
+     */
+    if(globals.substitutions) {
+      font.GSUB = new font.GSUB(globals);
+      addLabelSubstitution(font, globals);
+    }
+
+    // we're done.
+    return sfnt;
+  }
+};
+
+},{"./SFNT/SFNT":3,"./SFNT/tables/common/GSUB/addLabelSubstitution":45,"./formGlobals":63,"./utils":76}],2:[function(require,module,exports){
 var struct = require("../utils").struct;
 
 "use strict";
@@ -19,7 +170,7 @@ DirectoryEntry.prototype = new struct("DirectoryEntry", [
 
 module.exports = DirectoryEntry;
 
-},{"../utils":76}],2:[function(require,module,exports){
+},{"../utils":76}],3:[function(require,module,exports){
 var tables = require("./tables");
 var SFNTHeader = require("./SFNTHeader");
 var DirectoryEntry = require("./DirectoryEntry");
@@ -236,7 +387,7 @@ SFNT.prototype = {
 
 module.exports = SFNT;
 
-},{"../utils":76,"./DirectoryEntry":1,"./SFNTHeader":3,"./tables":4}],3:[function(require,module,exports){
+},{"../utils":76,"./DirectoryEntry":2,"./SFNTHeader":4,"./tables":5}],4:[function(require,module,exports){
 var struct = require("../utils").struct;
 
 "use strict";
@@ -261,7 +412,7 @@ module.exports = function(type) {
   return SFNTHeader;
 };
 
-},{"../utils":76}],4:[function(require,module,exports){
+},{"../utils":76}],5:[function(require,module,exports){
 "use strict";
 
 module.exports = {
@@ -281,7 +432,7 @@ module.exports = {
   BASE: require("./tables/BASE")
 };
 
-},{"./tables/BASE":5,"./tables/CFF_":6,"./tables/GDEF":7,"./tables/GPOS":8,"./tables/GSUB":9,"./tables/JSTF":10,"./tables/OS_2":11,"./tables/cmap":23,"./tables/head":52,"./tables/hhea":53,"./tables/hmtx":54,"./tables/maxp":56,"./tables/name":57,"./tables/post":61}],5:[function(require,module,exports){
+},{"./tables/BASE":6,"./tables/CFF_":7,"./tables/GDEF":8,"./tables/GPOS":9,"./tables/GSUB":10,"./tables/JSTF":11,"./tables/OS_2":12,"./tables/cmap":24,"./tables/head":53,"./tables/hhea":54,"./tables/hmtx":55,"./tables/maxp":57,"./tables/name":58,"./tables/post":62}],6:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -300,7 +451,7 @@ BASE.prototype = new struct("BASE table", [
 
 module.exports = BASE;
 
-},{"../../utils":76}],6:[function(require,module,exports){
+},{"../../utils":76}],7:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -376,7 +527,7 @@ var CFF = function(input) {
     var globalSubroutines = new SubroutineIndex();
     this["global subroutines"] = globalSubroutines;
 
-    // bind some global subroutines, if we have them.
+    // bind user-supplied global subroutines, if we have them.
     if (input.subroutines) {
       var routines = Object.keys(input.subroutines);
       routines.forEach(function(name, pos) {
@@ -391,7 +542,7 @@ var CFF = function(input) {
     var encoding = new Encoding(input);
     this["encoding"] = encoding;
 
-    var charStringIndex = new CharStringIndex(input.letters, input.charString);
+    var charStringIndex = new CharStringIndex(input.letters, input.charstrings);
     this["charstring index"] = charStringIndex;
 
     var privateDict = new PrivateDict({
@@ -408,13 +559,13 @@ var CFF = function(input) {
         "version":     stringIndex.getStringId(input.fontVersion)
       , "FullName":    stringIndex.getStringId(input.fontName)
       , "FamilyName":  stringIndex.getStringId(input.fontFamily)
-      , "Weight":      389     // one of the 390 default strings in the CFF string catalog
+      , "Weight":      389     // CFF-predefined string "Roman"
       , "UniqueID":    1       // really this just has to be 'anything'
       , "FontBBox":    [input.xMin, input.yMin, input.xMax, input.yMax]
       , "charset":     0       // placeholder for offset to charset block, from the beginning of the CFF file
       , "Encoding":    0       //          "   "            encoding block               "    "
       , "CharStrings": 0       //          "   "            charstrings block            "    "
-      , "Private":     [0, 0]  // sizeof + "   "            private dict block           "    "
+      , "Private":     [0, 0]  // sizeof,  "   "            private dict block           "    "
     });
     this["top dict index"] = topDictIndex;
 
@@ -437,7 +588,7 @@ CFF.prototype = new struct("CFF ", [
 
 module.exports = CFF;
 
-},{"../../utils":76,"./cff/CFFHeader":12,"./cff/CharStringIndex":13,"./cff/Charset":14,"./cff/Encoding":16,"./cff/NameIndex":18,"./cff/PrivateDict":19,"./cff/StringIndex":20,"./cff/SubroutineIndex":21,"./cff/TopDictIndex":22}],7:[function(require,module,exports){
+},{"../../utils":76,"./cff/CFFHeader":13,"./cff/CharStringIndex":14,"./cff/Charset":15,"./cff/Encoding":17,"./cff/NameIndex":19,"./cff/PrivateDict":20,"./cff/StringIndex":21,"./cff/SubroutineIndex":22,"./cff/TopDictIndex":23}],8:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -456,7 +607,7 @@ GDEF.prototype = new struct("GDEF table", [
 
 module.exports = GDEF;
 
-},{"../../utils":76}],8:[function(require,module,exports){
+},{"../../utils":76}],9:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -475,7 +626,7 @@ GPOS.prototype = new struct("GPOS table", [
 
 module.exports = GPOS;
 
-},{"../../utils":76}],9:[function(require,module,exports){
+},{"../../utils":76}],10:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 var ScriptList = require("./common/ScriptList");
@@ -541,7 +692,7 @@ GSUB.prototype.finalise = function() {
 
 module.exports = GSUB;
 
-},{"../../utils":76,"./common/FeatureList":38,"./common/LangSysTable":46,"./common/LookupList":47,"./common/ScriptList":49}],10:[function(require,module,exports){
+},{"../../utils":76,"./common/FeatureList":39,"./common/LangSysTable":47,"./common/LookupList":48,"./common/ScriptList":50}],11:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -560,7 +711,7 @@ JSTF.prototype = new struct("JSTF table", [
 
 module.exports = JSTF;
 
-},{"../../utils":76}],11:[function(require,module,exports){
+},{"../../utils":76}],12:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -674,7 +825,7 @@ OS_2.prototype = new struct("OS/2 table", [
 
 module.exports = OS_2;
 
-},{"../../utils":76}],12:[function(require,module,exports){
+},{"../../utils":76}],13:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -698,7 +849,7 @@ CFFHeader.prototype = new struct("CFF header", [
 
 module.exports = CFFHeader;
 
-},{"../../../utils":76}],13:[function(require,module,exports){
+},{"../../../utils":76}],14:[function(require,module,exports){
 var INDEX = require("./INDEX");
 var dataBuilding = require("../../../utils").dataBuilding;
 
@@ -706,20 +857,20 @@ var dataBuilding = require("../../../utils").dataBuilding;
 
 var encode = dataBuilding.encoder.CHARARRAY;
 
-var CharStringIndex = function(letters, charString) {
+var CharStringIndex = function(letters, charstrings) {
   var self = this;
   INDEX.call(this);
   this.setName("CharStringIndex");
-  // .notdef
+
+  // The .notdef character - for simplicity,
+  // this has no outline at all.
   this.addItem(dataBuilding.encoder.OPERAND(14));
-  // all letters except the "real" letters
+
+  // Real letters
   letters.forEach(function(letter, idx) {
-    if(idx < letters.length - 1) {
-      self.addItem(dataBuilding.encoder.OPERAND(14));
-    }
+    self.addItem(charstrings[letter]);
   });
-  // and then our true glyph
-  this.addItem(charString);
+
   this.finalise();
 }
 
@@ -727,7 +878,7 @@ CharStringIndex.prototype = Object.create(INDEX.prototype);
 
 module.exports = CharStringIndex;
 
-},{"../../../utils":76,"./INDEX":17}],14:[function(require,module,exports){
+},{"../../../utils":76,"./INDEX":18}],15:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -760,7 +911,7 @@ Charset.prototype = new struct("CFF charset", [
 
 module.exports =  Charset;
 
-},{"../../../utils":76}],15:[function(require,module,exports){
+},{"../../../utils":76}],16:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -788,7 +939,7 @@ DICT.prototype.finalise = function() {
 
 module.exports = DICT;
 
-},{"../../../utils":76}],16:[function(require,module,exports){
+},{"../../../utils":76}],17:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -820,7 +971,7 @@ Encoding.prototype = new struct("CFF Encoding", [
 
 module.exports = Encoding;
 
-},{"../../../utils":76}],17:[function(require,module,exports){
+},{"../../../utils":76}],18:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -917,7 +1068,7 @@ INDEX.prototype.finalise = function() {
 
 module.exports = INDEX;
 
-},{"../../../utils":76}],18:[function(require,module,exports){
+},{"../../../utils":76}],19:[function(require,module,exports){
 var INDEX = require("./INDEX");
 var utils = require("../../../utils");
 var struct = utils.struct;
@@ -940,7 +1091,7 @@ NameIndex.prototype = Object.create(INDEX.prototype);
 
 module.exports = NameIndex;
 
-},{"../../../utils":76,"./INDEX":17}],19:[function(require,module,exports){
+},{"../../../utils":76,"./INDEX":18}],20:[function(require,module,exports){
 var DICT = require("./DICT");
 
 "use strict";
@@ -954,7 +1105,7 @@ PrivateDict.prototype = Object.create(DICT.prototype);
 
 module.exports = PrivateDict;
 
-},{"./DICT":15}],20:[function(require,module,exports){
+},{"./DICT":16}],21:[function(require,module,exports){
 var INDEX = require("./INDEX");
 var utils = require("../../../utils");
 var dataBuilding = utils.dataBuilding;
@@ -983,7 +1134,7 @@ StringIndex.prototype.getStringId = function(string) {
 
 module.exports = StringIndex;
 
-},{"../../../utils":76,"./INDEX":17}],21:[function(require,module,exports){
+},{"../../../utils":76,"./INDEX":18}],22:[function(require,module,exports){
 var INDEX = require("./INDEX");
 var utils = require("../../../utils");
 var struct = utils.struct;
@@ -1000,7 +1151,7 @@ SubroutineIndex.prototype = Object.create(INDEX.prototype);
 
 module.exports = SubroutineIndex;
 
-},{"../../../utils":76,"./INDEX":17}],22:[function(require,module,exports){
+},{"../../../utils":76,"./INDEX":18}],23:[function(require,module,exports){
 var INDEX = require("./INDEX");
 var DICT = require("./DICT");
 
@@ -1022,7 +1173,7 @@ TopDictIndex.prototype.set = function(field, v) {
 
 module.exports = TopDictIndex;
 
-},{"./DICT":15,"./INDEX":17}],23:[function(require,module,exports){
+},{"./DICT":16,"./INDEX":18}],24:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 var EncodingRecord = require("./cmaps/EncodingRecord");
@@ -1069,7 +1220,7 @@ cmap.prototype.finalise = function() {
 
 module.exports = cmap;
 
-},{"../../utils":76,"./cmaps/EncodingRecord":24,"./cmaps/subtables":36}],24:[function(require,module,exports){
+},{"../../utils":76,"./cmaps/EncodingRecord":25,"./cmaps/subtables":37}],25:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1089,7 +1240,7 @@ EncodingRecord.prototype = new struct("EncodingRecord", [
 
 module.exports = EncodingRecord;
 
-},{"../../../utils":76}],25:[function(require,module,exports){
+},{"../../../utils":76}],26:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1108,7 +1259,7 @@ format0.prototype = new struct("cmap format 0", [
 
 module.exports = format0;
 
-},{"../../../utils":76}],26:[function(require,module,exports){
+},{"../../../utils":76}],27:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1127,7 +1278,7 @@ format10.prototype = new struct("cmap format 10", [
 
 module.exports = format10;
 
-},{"../../../utils":76}],27:[function(require,module,exports){
+},{"../../../utils":76}],28:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1146,7 +1297,7 @@ format12.prototype = new struct("cmap format 12", [
 
 module.exports = format12;
 
-},{"../../../utils":76}],28:[function(require,module,exports){
+},{"../../../utils":76}],29:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1165,7 +1316,7 @@ format13.prototype = new struct("cmap format 13", [
 
 module.exports = format13;
 
-},{"../../../utils":76}],29:[function(require,module,exports){
+},{"../../../utils":76}],30:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1184,7 +1335,7 @@ format14.prototype = new struct("cmap format 14", [
 
 module.exports = format14;
 
-},{"../../../utils":76}],30:[function(require,module,exports){
+},{"../../../utils":76}],31:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1203,7 +1354,7 @@ format2.prototype = new struct("cmap format 2", [
 
 module.exports = format2;
 
-},{"../../../utils":76}],31:[function(require,module,exports){
+},{"../../../utils":76}],32:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 var Segments  = require("./format4/Segments");
 
@@ -1306,7 +1457,7 @@ format4.prototype.build = function(options) {
 
 module.exports = format4;
 
-},{"../../../utils":76,"./format4/Segments":35}],32:[function(require,module,exports){
+},{"../../../utils":76,"./format4/Segments":36}],33:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1325,7 +1476,7 @@ format6.prototype = new struct("cmap format 6", [
 
 module.exports = format6;
 
-},{"../../../utils":76}],33:[function(require,module,exports){
+},{"../../../utils":76}],34:[function(require,module,exports){
 var struct = require("../../../utils").struct;
 
 "use strict";
@@ -1344,7 +1495,7 @@ format8.prototype = new struct("cmap format 8", [
 
 module.exports = format8;
 
-},{"../../../utils":76}],34:[function(require,module,exports){
+},{"../../../utils":76}],35:[function(require,module,exports){
 var struct = require("../../../../utils").struct;
 
 "use strict";
@@ -1366,7 +1517,7 @@ Segment.prototype = new struct("Segment", [
 
 module.exports = Segment;
 
-},{"../../../../utils":76}],35:[function(require,module,exports){
+},{"../../../../utils":76}],36:[function(require,module,exports){
 var utils = require("../../../../utils");
 var dataBuilding = utils.dataBuilding;
 var Segment = require("./Segment");
@@ -1404,7 +1555,7 @@ Segments.prototype = {
 
 module.exports = Segments;
 
-},{"../../../../utils":76,"./Segment":34}],36:[function(require,module,exports){
+},{"../../../../utils":76,"./Segment":35}],37:[function(require,module,exports){
 module.exports = {
   0: require("./format.0.js"),
   2: require("./format.2.js"),
@@ -1417,7 +1568,7 @@ module.exports = {
   14: require("./format.14.js")
 };
 
-},{"./format.0.js":25,"./format.10.js":26,"./format.12.js":27,"./format.13.js":28,"./format.14.js":29,"./format.2.js":30,"./format.4.js":31,"./format.6.js":32,"./format.8.js":33}],37:[function(require,module,exports){
+},{"./format.0.js":26,"./format.10.js":27,"./format.12.js":28,"./format.13.js":29,"./format.14.js":30,"./format.2.js":31,"./format.4.js":32,"./format.6.js":33,"./format.8.js":34}],38:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1501,7 +1652,7 @@ module.exports = {
   "2": CoverageFormat2
 };
 
-},{"../../../utils":76}],38:[function(require,module,exports){
+},{"../../../utils":76}],39:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var FeatureRecord = require("./FeatureRecord");
@@ -1562,7 +1713,7 @@ FeatureList.prototype.finalise = function() {
 
 module.exports = FeatureList;
 
-},{"../../../utils":76,"./FeatureRecord":39,"./FeatureTable":40}],39:[function(require,module,exports){
+},{"../../../utils":76,"./FeatureRecord":40,"./FeatureTable":41}],40:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -1582,7 +1733,7 @@ FeatureRecord.prototype = new struct("FeatureRecord", [
 
 module.exports = FeatureRecord;
 
-},{"../../../utils":76}],40:[function(require,module,exports){
+},{"../../../utils":76}],41:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1617,7 +1768,7 @@ FeatureTable.prototype.finalise = function(idx) {
 
 module.exports = FeatureTable;
 
-},{"../../../utils":76}],41:[function(require,module,exports){
+},{"../../../utils":76}],42:[function(require,module,exports){
 var utils = require("../../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1668,7 +1819,7 @@ LigatureSet.prototype.finalise = function() {
 
 module.exports = LigatureSet;
 
-},{"../../../../utils":76,"./LigatureTable":42}],42:[function(require,module,exports){
+},{"../../../../utils":76,"./LigatureTable":43}],43:[function(require,module,exports){
 var utils = require("../../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1700,7 +1851,7 @@ LigatureTable.prototype.finalise = function() {
 
 module.exports = LigatureTable;
 
-},{"../../../../utils":76}],43:[function(require,module,exports){
+},{"../../../../utils":76}],44:[function(require,module,exports){
 var utils = require("../../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1767,7 +1918,7 @@ LookupType4.prototype.finalise = function() {
 
 module.exports = LookupType4;
 
-},{"../../../../utils":76,"../CoverageFormat":37,"./LigatureSet":41}],44:[function(require,module,exports){
+},{"../../../../utils":76,"../CoverageFormat":38,"./LigatureSet":42}],45:[function(require,module,exports){
 /**
  * Substitution tables are hilariously complex, due to OpenType's concept
  * of scripts, language systems, features, and lookups.
@@ -1806,27 +1957,28 @@ module.exports = function addLabelSubstitution(font, globals) {
     //         Also note this is now just a "loose" lookup on
     //         the heap of lookups.
 
-    var inputs = globals.letters.slice();
-    inputs.splice(0,1);
-    inputs.splice(inputs.length-1,1);
-
 
     // step 1a: in order to set up a "multiple letters become one letter"
     //          substitution, we need to create a GSUB "type 4" lookup, which
     //          models the "many-to-one substitution" effect.
     var lookup = font.GSUB.addLookup({ LookupType: 4 });
-    var subtable = lookup.addSubTable();
 
 
     // step 1b: In order to define a substitution lookup, we need to
     //          list all the letters for which substitutions are going
     //          to be necessary. If we're going to substitute "fl" with
     //          something, as well as "etc" with something, this coverage
-    //          list would be ['e', 'f'], for instance. We're only
-    //          substituting "custom", so our list is just ['c'].
-    subtable.addCoverage([
-      globals.letters.indexOf(globals.label[0]) + 1 // offset for .notdef
-    ]);
+    //          list would be ['e', 'f'], for instance.
+    var substitutions = Object.keys(globals.substitutions);
+    var primaries = substitutions.map(function(v) { return (v.split(','))[0]; });
+    primaries = primaries.filter(function(e,pos) {
+        return primaries.indexOf(e) === pos;
+    }).map(function(e) {
+        return globals.letters.indexOf(e) + 1; // offset added to account for .notdef
+    });
+
+    var subtable = lookup.addSubTable();
+    subtable.addCoverage(primaries);
 
 
     // step 1c: substitutions use ligature sets.
@@ -1835,13 +1987,26 @@ module.exports = function addLabelSubstitution(font, globals) {
 
     // step 1d: because the ligature sets go in the ligature table: the bit
     //          that, ultimately, does the work for us.
-    var ligatureTable = ligatureSet.addLigatureTable({
-      LigGlyph: globals.letters.length,
-      Components: globals.label.split('').slice(1).map(function(v) {
-                    return globals.letters.indexOf(v) + 1;
-                  })
-                  // We don't need letters[0] because the coverage table will
-                  // imply the first letter in the ligature
+    substitutions.forEach(function(key) {
+        var glyphs = key.split(',');
+
+        // the single glyph we want to end up with:
+        var target = globals.substitutions[key];
+
+        //  its corresponding glyph ID:
+        var LigGlyph = globals.letters.indexOf(target) + 1; // offset to account for .notdef
+
+        //  the sequence of glyphs that will trigger this substitution,
+        //  *without* the first one, which is already specified in the
+        //  coverage table, so we don't need to repeat it here:
+        var Components = glyphs.slice(1).map(function(v) {
+            return globals.letters.indexOf(v) + 1; // offset to account for .notdef
+        });
+
+        ligatureSet.addLigatureTable({
+          LigGlyph: LigGlyph,
+          Components: Components
+        });
     });
 
 
@@ -1871,12 +2036,12 @@ module.exports = function addLabelSubstitution(font, globals) {
     font.GSUB.finalise();
 };
 
-},{}],45:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 module.exports = {
  	"4": require("./LookupType4")
 };
 
-},{"./LookupType4":43}],46:[function(require,module,exports){
+},{"./LookupType4":44}],47:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1915,7 +2080,7 @@ LangSysTable.prototype.finalise = function() {
 
 module.exports = LangSysTable;
 
-},{"../../../utils":76}],47:[function(require,module,exports){
+},{"../../../utils":76}],48:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -1960,7 +2125,7 @@ LookupList.prototype.finalise = function() {
 
 module.exports = LookupList;
 
-},{"../../../utils":76,"./LookupTable":48}],48:[function(require,module,exports){
+},{"../../../utils":76,"./LookupTable":49}],49:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var dataBuilding = utils.dataBuilding;
@@ -2014,7 +2179,7 @@ LookupTable.prototype.finalise = function(idx) {
 
 module.exports = LookupTable;
 
-},{"../../../utils":76,"./GSUB/lookups":45}],49:[function(require,module,exports){
+},{"../../../utils":76,"./GSUB/lookups":46}],50:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var ScriptRecord = require("./ScriptRecord");
@@ -2097,7 +2262,7 @@ ScriptList.prototype.finalise = function() {
 
 module.exports = ScriptList;
 
-},{"../../../utils":76,"./ScriptRecord":50,"./ScriptTable":51}],50:[function(require,module,exports){
+},{"../../../utils":76,"./ScriptRecord":51,"./ScriptTable":52}],51:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2118,7 +2283,7 @@ ScriptRecord.prototype = new struct("ScriptRecord", [
 
 module.exports = ScriptRecord;
 
-},{"../../../utils":76}],51:[function(require,module,exports){
+},{"../../../utils":76}],52:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2156,7 +2321,7 @@ ScriptTable.prototype.finalise = function(lookups) {
 
 module.exports = ScriptTable;
 
-},{"../../../utils":76}],52:[function(require,module,exports){
+},{"../../../utils":76}],53:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2205,7 +2370,7 @@ head.prototype = new struct("head table", [
 
 module.exports = head;
 
-},{"../../utils":76}],53:[function(require,module,exports){
+},{"../../utils":76}],54:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2248,7 +2413,7 @@ hhea.prototype = new struct("hhea table", [
 
 module.exports = hhea;
 
-},{"../../utils":76}],54:[function(require,module,exports){
+},{"../../utils":76}],55:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 var LongHorMetric = require("./hmtx/LongHorMetric");
@@ -2280,7 +2445,7 @@ hmtx.prototype.build = function(globals, numberOfHMetrics) {
 
 module.exports = hmtx;
 
-},{"../../utils":76,"./hmtx/LongHorMetric":55}],55:[function(require,module,exports){
+},{"../../utils":76,"./hmtx/LongHorMetric":56}],56:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2306,7 +2471,7 @@ LongHorMetric.prototype = new struct("LongHorMetric", [
 
 module.exports = LongHorMetric;
 
-},{"../../../utils":76}],56:[function(require,module,exports){
+},{"../../../utils":76}],57:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2347,7 +2512,7 @@ maxp.prototype = new struct("maxp table", [
 
 module.exports = maxp;
 
-},{"../../utils":76}],57:[function(require,module,exports){
+},{"../../utils":76}],58:[function(require,module,exports){
 /**
  * Name table
  */
@@ -2459,7 +2624,7 @@ name.prototype.finalise = function() {
 
 module.exports = name;
 
-},{"../../utils":76,"./name/NameRecords":59}],58:[function(require,module,exports){
+},{"../../utils":76,"./name/NameRecords":60}],59:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 
@@ -2489,7 +2654,7 @@ NameRecord.prototype = new struct("NameRecord", [
 
 module.exports = NameRecord;
 
-},{"../../../utils":76}],59:[function(require,module,exports){
+},{"../../../utils":76}],60:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var NameRecord = require("./NameRecord");
@@ -2551,7 +2716,7 @@ NameRecords.prototype.finalise = function() {
 
 module.exports = NameRecords;
 
-},{"../../../utils":76,"./NameRecord":58,"./StringRecord":60}],60:[function(require,module,exports){
+},{"../../../utils":76,"./NameRecord":59,"./StringRecord":61}],61:[function(require,module,exports){
 var utils = require("../../../utils");
 var struct = utils.struct;
 var atou = utils.atou;
@@ -2577,7 +2742,7 @@ StringRecord.prototype = new struct("StringRecord", [
 
 module.exports = StringRecord;
 
-},{"../../../utils":76}],61:[function(require,module,exports){
+},{"../../../utils":76}],62:[function(require,module,exports){
 var utils = require("../../utils");
 var struct = utils.struct;
 
@@ -2613,209 +2778,47 @@ post.prototype = new struct("post table", [
 
 module.exports = post;
 
-},{"../../utils":76}],62:[function(require,module,exports){
-"use strict";
-
-var SFNT = require('./SFNT/SFNT');
-var formGlobals = require('./formGlobals');
+},{"../../utils":76}],63:[function(require,module,exports){
 var utils = require('./utils');
-var asChars = utils.asChars;
-var asGlyphIDs = utils.asGlyphIDs;
-var addLabelSubstitution = require("./SFNT/tables/common/GSUB/addLabelSubstitution");
-
-module.exports = {
-  utils: utils,
-
-  build: function (options) {
-    var sfnt = new SFNT();
-    var font = sfnt.stub;
-    var globals = formGlobals(options);
-
-    /**
-     * Font header
-     */
-    font.head = new font.head({
-      unitsPerEM: globals.quadSize,
-      xMin: globals.xMin,
-      yMin: globals.yMin,
-      xMax: globals.xMax,
-      yMax: globals.yMax,
-    });
-
-
-    /**
-     * Horizontal metrics header table
-     */
-    font.hhea = new font.hhea({
-      Ascender: globals.quadSize + globals.yMin,
-      Descender: -(globals.quadSize - globals.yMax),
-      advanceWidthMax: globals.xMax - globals.xMin,
-      xMaxExtent: globals.xMax - globals.xMin,
-      numberOfHMetrics: globals.letters ? 1 + globals.letters.length : 2
-    });
-
-
-    /**
-     * Horizontal metrics table
-     */
-    font.hmtx = new font.hmtx(globals, font.hhea.numberOfHMetrics);
-
-
-    /**
-     * Max profiles - CFF does not use these, which we indicate by
-     * using a table version 0.5
-     */
-    font.maxp = new font.maxp({
-      version: 0x00005000,
-      numGlyphs: globals.letters ? 1 + globals.letters.length : 2
-    });
-
-
-    /**
-     * The name table
-     *
-     * - to have a font be windows installable, we need strings 1, 2, 3, and 6.
-     * - to have a font be OSX installable, we need strings 1, 2, 3, 4, 5, and 6.
-     * - to have a font be webfont-usable, we just need strings 1 and 2.
-     *
-     * (OTS may be patched at some point to not even check the name table at
-     *  all, at which point we don't have to bother generating it for webfonts)
-     */
-    font.name = new font.name(globals);
-
-
-    /**
-     * The OS/2 table
-     */
-    font["OS/2"] = new font["OS/2"]({
-      // we use version 3, so we can pass Microsoft's "Font Validator"
-      version: 0x0003,
-      // we implement part of the basic latin unicode block
-      ulUnicodeRange1: 0x00000001,
-      achVendID: globals.vendorId,
-      usFirstCharIndex: globals.label ? globals.letters[0].charCodeAt(0) : globals.glyphCode,
-      usLastCharIndex: globals.glyphCode,
-      // vertical metrics: see http://typophile.com/node/13081 for how the hell these work.
-      // (short version: they don't, it's an amazing mess)
-      sTypoAscender: globals.yMax,
-      sTypoDescender: globals.yMin,
-      sTypoLineGap: globals.quadSize - globals.yMax + globals.yMin,
-      usWinAscent: globals.quadSize + globals.yMin,
-      usWinDescent: (globals.quadSize - globals.yMax),
-      // we implement part of the latin1 codepage
-      ulCodePageRange1: 0x00000001,
-      // we have no break char, but we must point to a "not .notdef" glyphid to
-      // validate as "legal font". Normally this would be the 'space' glyphid.
-      usBreakChar: globals.glyphCode,
-      // We have plain + ligature use, therefore the max length of
-      // all contexts are simply the length of our substitution label,
-      // if we have one, or otherwise zero.
-      usMaxContext: globals.label !== false ? globals.label.length : 0
-    });
-
-
-    /**
-     * The post table -- this table should not be necessary for
-     * webfonts, but for now must be included for the font to be legal.
-     */
-    font.post = new font.post();
-
-
-    /**
-     * The character map for this font, using a cmap
-     * format 4 subtable for our implemented glyphs.
-     */
-    font.cmap = new font.cmap({ version: 0 });
-    font.cmap.addTable({ format: 4, letters: globals.letters });
-    font.cmap.finalise();
-
-
-    /**
-     * The CFF table for this font. This is, ironically,
-     * the actual font, rather than a million different
-     * bits of metadata *about* the font and its glyphs.
-     *
-     * It's also the most complex bit (closely followed
-     * by the GSUB table for ligature substitution), which
-     * is why the CFF table isn't actually a struct, but
-     * a somewhat different bytecode generator.
-     *
-     * It works, it just works a little different from
-     * everything else.
-     */
-    font["CFF "] = new font["CFF "](globals);
-
-
-    /**
-     * Finally, if there was a "label", we need some GSUB magic.
-     * note: this shit is complex. Like, properly, which is why
-     * it's wrapped by a function, rather than being a simple
-     * few constructor options. Seriously, GSUB is messed up.
-     */
-    if(globals.label) {
-      font.GSUB = new font.GSUB(globals);
-      addLabelSubstitution(font, globals);
-    }
-
-    // we're done...
-    return sfnt;
-  }
-};
-
-},{"./SFNT/SFNT":2,"./SFNT/tables/common/GSUB/addLabelSubstitution":44,"./formGlobals":63,"./utils":76}],63:[function(require,module,exports){
-var utils = require('./utils');
-var convertOutline = utils.convertOutline;
 
 "use strict";
 
 module.exports = function(options) {
+  var defaultQuad = 1024;
 
-  // ensure we have all the necessary globals
-  var glyphName = options.glyphName || "~";
-  var glyphCode = glyphName.charCodeAt(0);
   var globals = {
-      outline: options.outline || ""
-    , charString: options.charString || false
-    , vendorId: " =) "
+      minimal: options.minimal !== "undefined" ? options.minimal : false
+    , compliant: options.compliant !== "undefined" ? options.compliant : true
+
+    // builder metadata
+    , quadSize: options.quadSize || defaultQuad
+    , identifier: options.identifier || "-"
+
+    // GSUB magic?
+    , substitutions: options.substitutions || false
+
+    // Name table information
     , fontFamily: options.fontFamily || "Custom"
     , subFamily: options.subFamily || "Regular"
     , fontName: options.fontName || "Custom Glyph Font"
     , postscriptName: options.postscriptName || "customfont"
     , fontVersion: options.fontVersion || "Version 1.0"
-    , copyright: options.copyright || "License-free"
-    , trademark: options.trademark || "Trademark-free"
-    , license: options.license || "License-free"
-    , glyphName: glyphName
-    , glyphCode: glyphCode
-    , quadSize: options.quadSize || 1024
-    , label: options.label || false
-    , identifier: options.identifier || "-"
-    , minimal: options.minimal !== "undefined" ? options.minimal : false
-    , compliant: options.compliant !== "undefined" ? options.compliant : true
-    , letters: (function(globals, glyphCode) {
-        var letters = [glyphName];
-        if(globals.label) {
-          letters = [];
-          globals.label.split('').forEach(function(l) {
-            if(letters.indexOf(l) === -1) {
-              letters.push(l);
-            }
-          });
-          letters.push(String.fromCharCode(glyphCode));
-          letters.sort();
-        }
-        return letters;
-      }(options, glyphCode))
-    , subroutines: options.subroutines,
-    xMin: options.xMin || false,
-    yMin: options.yMin || false,
-    xMax: options.xMax || false,
-    yMax: options.yMax || false
-  };
+    , copyright: options.copyright || "Free of copyright"
+    , trademark: options.trademark || "Free of trademarks"
+    , license: options.license || "License free"
+    , vendorId: " =) "
 
-  // Turn the SVG outline into a charstring,
-  // and ensure correct bounding values.
-  globals.charString = convertOutline(globals);
+    // cmap/charstring information
+    , letters: Object.keys(options.charstrings || {}).sort()
+    , charstrings: options.charstrings
+    , subroutines: options.subroutines
+
+    // font master bounding box
+    , xMin: options.xMin || 0
+    , yMin: options.yMin || 0
+    , xMax: options.xMax || defaultQuad
+    , yMax: options.yMax || defaultQuad
+  };
 
 	return globals;
 };
@@ -4154,5 +4157,5 @@ module.exports = function toWOFF(font) {
   return woff_header.toData().concat(woff_dictionary).concat(woff_data);
 };
 
-},{"./dataBuilding":74,"./struct":80}]},{},[62])(62)
+},{"./dataBuilding":74,"./struct":80}]},{},[1])(1)
 });

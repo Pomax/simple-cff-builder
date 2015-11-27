@@ -75,6 +75,7 @@ module.exports = {
       // we use version 3, so we can pass Microsoft's "Font Validator"
       version: 0x0003,
       // we implement part of the basic latin unicode block
+      // FIXME: this should be based on the globals.letters list
       ulUnicodeRange1: 0x00000001,
       achVendID: globals.vendorId,
       usFirstCharIndex: globals.label ? globals.letters[0].charCodeAt(0) : globals.glyphCode,
@@ -87,6 +88,7 @@ module.exports = {
       usWinAscent: globals.quadSize + globals.yMin,
       usWinDescent: (globals.quadSize - globals.yMax),
       // we implement part of the latin1 codepage
+      // FIXME: this should also be based on the globals.letters list
       ulCodePageRange1: 0x00000001,
       // we have no break char, but we must point to a "not .notdef" glyphid to
       // validate as "legal font". Normally this would be the 'space' glyphid.
@@ -94,7 +96,7 @@ module.exports = {
       // We have plain + ligature use, therefore the max length of
       // all contexts are simply the length of our substitution label,
       // if we have one, or otherwise zero.
-      usMaxContext: globals.label !== false ? globals.label.length : 0
+      usMaxContext: globals.substitutions !== false ? Object.keys(globals.substitutions).length : 0
     });
 
 
@@ -131,17 +133,17 @@ module.exports = {
 
 
     /**
-     * Finally, if there was a "label", we need some GSUB magic.
-     * note: this shit is complex. Like, properly, which is why
-     * it's wrapped by a function, rather than being a simple
-     * few constructor options. Seriously, GSUB is messed up.
+     * Finally, if there were  "substitutions", we need some GSUB
+     * magic. Note: this stuff is complex. Like, properly, which
+     * is why it's wrapped by a function, rather than being a simple
+     * few constructor options. Seriously, GSUB is voodoo black magic.
      */
-    if(globals.label) {
+    if(globals.substitutions) {
       font.GSUB = new font.GSUB(globals);
       addLabelSubstitution(font, globals);
     }
 
-    // we're done...
+    // we're done.
     return sfnt;
   }
 };
