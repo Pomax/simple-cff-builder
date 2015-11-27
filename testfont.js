@@ -64,6 +64,9 @@ function buildFont() {
   // show the gsubs region in the CFF block
   SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
 
+  // show the gsubs region in the CFF block
+  SFNT.utils.buildTables(font.stub["GSUB"], window, "#gsub", false, false, false, true);
+
   // build CSS stylesheet
   SFNT.utils.addStyleSheet(font, "customfont", "custom");
 
