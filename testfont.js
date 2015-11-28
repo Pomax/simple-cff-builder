@@ -2,15 +2,15 @@
 
 
 /**
- * ...
+ * See the ./subroutines/program.---.type2 files for these instructions:
  */
 var customFunctions = [
     "default"
-  , "sin"
-  , "cos"
-  , "rotate"
-  , "move"
-  , "line"
+//  , "sin"
+//  , "cos"
+//  , "rotate"
+//  , "move"
+//  , "line"
 ];
 
 
