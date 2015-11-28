@@ -1,0 +1,26 @@
+a, a:visited, a:active, a:hover {
+  color: rgba(40, 0, 198, 0.85);
+  text-decoration: none;
+}    
+.b:hover {
+  border: 1px solid black;
+  margin: -1px;
+  display: inline-block;
+  background: rgba(135, 196, 255, 0.4);
+  cursor: text;
+}
+span.customfont {
+  font-family: customfont;
+  -moz-font-feature-settings:"liga=1, dlig=1"; 
+  -moz-font-feature-settings:"liga", "dlig"; /* EDIT: new syntax for FF 15+ */ 
+  -ms-font-feature-settings:"liga", "dlig"; 
+  -o-font-feature-settings:"liga", "dlig"; 
+  -webkit-font-feature-settings:"liga", "dlig"; 
+  font-feature-settings:"liga", "dlig";
+}
+h1, h3 {
+  margin: 0;
+}
+header {
+  margin-bottom: 2em;
+}

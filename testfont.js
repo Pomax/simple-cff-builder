@@ -51,10 +51,10 @@ function buildFont() {
   // For now we hardcode the font's bbox, but we could also just
   // run through all the charstrings for that information, instead.
   var options = {
-    xMin: 0,
-    yMin: 0,
-    xMax: 700,
-    yMax: 700,
+    xMin:    0,
+    yMin: -100,
+    xMax:  730,
+    yMax:  600,
     charstrings: charstrings,
     subroutines: subroutines,
     substitutions: substitutions
