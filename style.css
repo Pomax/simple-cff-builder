@@ -2,6 +2,7 @@ a, a:visited, a:active, a:hover {
   color: rgba(40, 0, 198, 0.85);
   text-decoration: none;
   border: none;
+  user-select: 0;
 }    
 .b:hover {
   border: 1px solid black;
