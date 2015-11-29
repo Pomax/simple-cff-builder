@@ -3,7 +3,6 @@
 default:
 
 # 700 x 700 outer box:
-
    0 -100  rmoveto
    0  700  rlineto
  700    0  rlineto

@@ -5,12 +5,12 @@
  * See the ./subroutines/program.---.type2 files for these instructions:
  */
 var customFunctions = [
-    "default"
-  , "sin"
+    "sin"
   , "cos"
   , "rotate"
   , "move"
   , "line"
+  , "default"
 ];
 
 
@@ -61,10 +61,12 @@ function buildFont() {
                };
              }, dims[0]);
 
+  console.log(dims);
+
   // For now we hardcode the font's bbox, but we could also just
   // run through all the charstrings for that information, instead.
   var options = dims;
-  options.rsb = 100;
+  options.rsb = 0;
   options.charstrings = charstrings;
   options.subroutines = subroutines;
   options.substitutions = substitutions;
