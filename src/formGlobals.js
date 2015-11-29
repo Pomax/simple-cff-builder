@@ -3,6 +3,8 @@ var utils = require('./utils');
 "use strict";
 
 module.exports = function(options) {
+    console.log(options);
+
   var defaultQuad = 1024;
 
   var globals = {
@@ -37,7 +39,13 @@ module.exports = function(options) {
     , yMin: options.yMin || 0
     , xMax: options.xMax || defaultQuad
     , yMax: options.yMax || defaultQuad
+
+    // font default left/right side bearings
+    , lsb: options.lsb || 0
+    , rsb: options.rsb || 0
   };
 
-	return globals;
+  console.log(globals);
+
+  return globals;
 };

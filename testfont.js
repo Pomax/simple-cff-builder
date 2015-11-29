@@ -6,11 +6,11 @@
  */
 var customFunctions = [
     "default"
-//  , "sin"
-//  , "cos"
-//  , "rotate"
-//  , "move"
-//  , "line"
+  , "sin"
+  , "cos"
+  , "rotate"
+  , "move"
+  , "line"
 ];
 
 
@@ -48,17 +48,26 @@ function buildFont() {
     "R,E,C,T,A,N,G,L,E": "rectangle"
   };
 
+  // find out the font's global bounding box
+  var dims = Object.keys(charstrings)
+             .map(function(v) { return charstrings[v]; })
+             .map(function(v) { return Type2Convert.getBounds(v, subroutines); });
+      dims = dims.reduce(function(a,b) {
+               return {
+                 xMin: a.xMin < b.xMin ? a.xMin : b.xMin,
+                 yMin: a.yMin < b.yMin ? a.yMin : b.yMin,
+                 xMax: a.xMax > b.xMax ? a.xMax : b.xMax,
+                 yMax: a.yMax > b.yMax ? a.yMax : b.yMax
+               };
+             }, dims[0]);
+
   // For now we hardcode the font's bbox, but we could also just
   // run through all the charstrings for that information, instead.
-  var options = {
-    xMin:    0,
-    yMin: -100,
-    xMax:  730,
-    yMax:  600,
-    charstrings: charstrings,
-    subroutines: subroutines,
-    substitutions: substitutions
-  };
+  var options = dims;
+  options.rsb = 100;
+  options.charstrings = charstrings;
+  options.subroutines = subroutines;
+  options.substitutions = substitutions;
 
   // Right: build that font!
   var font = SFNT.build(options);

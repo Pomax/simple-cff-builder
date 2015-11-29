@@ -2320,10 +2320,10 @@ hmtx.prototype.createMetric = function(advanceWidth, lsb) {
 
 hmtx.prototype.build = function(globals, numberOfHMetrics) {
   var data = []
-  var advanceWidth = (globals.xMax - globals.xMin);
-  var lsb = globals.xMin;
-  // FIXME: retrieve these valkues by examining globals.charstrings
+  var advanceWidth = globals.lsb + (globals.xMax - globals.xMin) + globals.rsb;
+  var lsb = globals.lsb;
   for(var i=0; i < numberOfHMetrics - 1; i++) {
+    // FIXME: retrieve these values from something linked to globals.charstrings, instead.
     data.push(this.createMetric(advanceWidth, lsb));
   }
   data.push(this.createMetric(advanceWidth, lsb));
@@ -2671,6 +2671,8 @@ var utils = require('./utils');
 "use strict";
 
 module.exports = function(options) {
+    console.log(options);
+
   var defaultQuad = 1024;
 
   var globals = {
@@ -2705,9 +2707,15 @@ module.exports = function(options) {
     , yMin: options.yMin || 0
     , xMax: options.xMax || defaultQuad
     , yMax: options.yMax || defaultQuad
+
+    // font default left/right side bearings
+    , lsb: options.lsb || 0
+    , rsb: options.rsb || 0
   };
 
-	return globals;
+  console.log(globals);
+
+  return globals;
 };
 },{"./utils":76}],63:[function(require,module,exports){
 "use strict";
