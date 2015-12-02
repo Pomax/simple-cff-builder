@@ -1,22 +1,16 @@
-# a boxity box
+default: // [boxitybox]
 
-default:
+    0    0  rmoveto
+    0  700  rlineto
+  700    0  rlineto
+    0 -700  rlineto
+ -700    0  rlineto
 
-# 700 x 700 outer box:
-   0 -100  rmoveto
-   0  700  rlineto
- 700    0  rlineto
-   0 -700  rlineto
--700    0  rlineto
+  100  100  rmoveto
+  500    0  rlineto
+    0  500  rlineto
+ -500    0  rlineto
+    0 -500  rlineto
 
-# 500 x 500 inner box:
-
- 100  100  rmoveto
- 500    0  rlineto
-   0  500  rlineto
--500    0  rlineto
-   0 -500  rlineto
-
-# done
 endchar
 return

@@ -1,10 +1,17 @@
 #
-#   This function relies on the [0,1] version of 
-#   the Bhaskara I's method of approximating sin(x)
-#   and uses this to determin cos(x) as sin(x + 0.5)
+#   This function relies on the [0,1] version of
+#   the Bhaskara I's method of approximating sin(x).
+#
+#             1 - 4x^2
+#   cos(x) = -----------
+#             1 + x^2
+#
 
 cos():
 
-  0.5, add, sin()
+  dup mul dup 4 mul // [x^2, 4x^2]
+  1 exch sub        // [x^2, 1 - 4x^2]
+  exch 1 add        // [1 - 4x^2, 1 + x^2]
+  div
 
 return

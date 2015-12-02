@@ -45,7 +45,5 @@ module.exports = function(options) {
     , rsb: options.rsb || 0
   };
 
-  console.log(globals);
-
   return globals;
 };

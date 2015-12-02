@@ -16,8 +16,6 @@
 #   sin(x) = 4 * -----------
 #                5 - 4x(1-x)
 #
-#
-#
 #   Limitations: currently implementation for interval [0,1]
 #
 

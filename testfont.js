@@ -1,138 +1,36 @@
-"use strict";
+(function() {
+  "use strict";
 
+  var type2 = new Type2();
+  var customFunctions = ["default"];
+  var loader = new Loader(type2, customFunctions);
 
-/**
- * See the ./subroutines/program.---.type2 files for these instructions:
- */
-var customFunctions = [
-    "sin"
-  , "cos"
-  , "rotate"
-  , "move"
-  , "line"
-  , "default"
-];
-
-
-/**
- * A simple utility function for forming charstrings
- */
-var charstring = function(arr) {
-  return Type2Convert.toBytes(arr.join(" "));
-}
-
-
-/**
- * ...
- */
-function buildFont() {
-  // Get the global subroutines, fixing the bias to its true value.
-  // This must be done before forming "real" charstrings for each letter.
-  var subroutines = Type2Convert.getSubroutines();
-
-  // Let's support A through Z for now. Without outlines.
-  var charstrings = {};
-  var first = 0x41, last = 0x5A;
-  for (var i=first; i<last; i++) {
-    charstrings[String.fromCharCode(i)] = charstring(["endchar"]);
+  function buildPlainFont(charstrings) {
+    charstrings["alphabet"] = loader.charstring(["default"]);
+    charstrings["rectangle"] = loader.charstring(["default"]);
+    return charstrings;
   }
 
-  // And let's add two ligatures, because we can.
-  // First, the targets:
-  charstrings["alphabet"] = charstring(["default"]);
-  charstrings["rectangle"] = charstring(["default"]);
+  function buildFont() {
+    var subroutines = type2.getSubroutines();
+    var charstrings = loader.getCharstrings(type2);
+    var plain = buildPlainFont(charstrings);
 
-  // And then, the substitution rules:
-  var substitutions = {
-    "A,B,C": "alphabet",
-    "R,E,C,T,A,N,G,L,E": "rectangle"
-  };
+    var substitutions = loader.getSubstitutions();
+    var font = loader.buildFontObject(plain, subroutines, substitutions);
 
-  // find out the font's global bounding box
-  var dims = Object.keys(charstrings)
-             .map(function(v) { return charstrings[v]; })
-             .map(function(v) { return Type2Convert.getBounds(v, subroutines); });
-      dims = dims.reduce(function(a,b) {
-               return {
-                 xMin: a.xMin < b.xMin ? a.xMin : b.xMin,
-                 yMin: a.yMin < b.yMin ? a.yMin : b.yMin,
-                 xMax: a.xMax > b.xMax ? a.xMax : b.xMax,
-                 yMax: a.yMax > b.yMax ? a.yMax : b.yMax
-               };
-             }, dims[0]);
+    // Show the OpenType GSUB table:
+    SFNT.utils.buildTables(font.stub["GSUB"], window, "#gsub", false, false, false, true);
 
-  console.log(dims);
+    // Build a CSS stylesheet that loads the font as base64-encoded WOFF resource:
+    SFNT.utils.addStyleSheet(font, "customfont", "custom");
 
-  // For now we hardcode the font's bbox, but we could also just
-  // run through all the charstrings for that information, instead.
-  var options = dims;
-  options.rsb = 0;
-  options.charstrings = charstrings;
-  options.subroutines = subroutines;
-  options.substitutions = substitutions;
-
-  // Right: build that font!
-  var font = SFNT.build(options);
-
-  // Show the gsubrs region in the CFF block:
-  SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
-
-  // Show the OpenType GSUB table:
-  SFNT.utils.buildTables(font.stub["GSUB"], window, "#gsub", false, false, false, true);
-
-  // Build a CSS stylesheet that loads the font as base64-encoded WOFF resource:
-  SFNT.utils.addStyleSheet(font, "customfont", "custom");
-
-  // And add a download link for easy debugging, for good measure.
-  var a = document.getElementById("download");
-  a.href = font.toDataURL();
-  a.download = "font.otf";
-}
+    // how big is this font?
+    var binary = font.toData();
+    var fsize = document.querySelector(".fsize");
+    fsize.textContent = binary.length;
+  }
 
 
-/**
- * ...
- */
-function fetch(url, onload, onerror) {
-  var xhr = new XMLHttpRequest();
-  xhr.open("GET", url, false);
-  xhr.overrideMimeType("text/plain; charset=x-user-defined");
-  xhr.onload = function() { onload(xhr.response); };
-  xhr.onerror = onerror;
-  xhr.send(null);
-}
-
-
-/**
- * ...
- */
-function handleSheet(response) {
-  var parts = response.split("\n")
-                      .map(function(f) {
-                        return f.replace(/\/\/.*$/,'')
-                                .replace(/#.*$/,'')
-                                .trim();
-                      })
-                      .filter(function(f) { return !!f; })
-                      .join(" ")
-                      .split(":")
-                      .map(function(f) { return f.trim(); });
-  var name = parts[0];
-  var bytes = Type2Convert.toBytes(parts[1]);
-  Type2Convert.bindSubroutine(name, bytes);
-  handleSheets();
-}
-
-/**
- * ...
- */
-function handleSheets() {
-  if (customFunctions.length === 0) return buildFont();
-  var thing = customFunctions.splice(0,1)[0];
-  fetch('./subroutines/program.'+thing+'.type2', handleSheet);
-};
-
-/**
- * ...
- */
-handleSheets();
+  loader.handleSheets(buildFont);
+}());
