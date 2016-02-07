@@ -1,4 +1,4 @@
-default: // [boxitybox]
+default: // [right now, a simple box, but you can make it whatever you like]
 
     0    0  rmoveto
     0  700  rlineto

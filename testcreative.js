@@ -34,7 +34,7 @@
     SFNT.utils.buildTables(font.stub["CFF "]["global subroutines"], window, "#cffgsubr", false, false, false, true);
 
     // And add a download link for easy debugging, for good measure.
-    var a = document.getElementById("download");
+    var a = document.getElementById("download-creative");
     a.href = font.toDataURL();
     a.download = "font.otf";
   }

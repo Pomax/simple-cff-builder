@@ -29,6 +29,11 @@
     var binary = font.toData();
     var fsize = document.querySelector(".fsize");
     fsize.textContent = binary.length;
+
+    // And add a download link for easy debugging, for good measure.
+    var a = document.getElementById("download-plain");
+    a.href = font.toDataURL();
+    a.download = "font.otf";
   }
 
 
