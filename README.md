@@ -1,6 +1,6 @@
 A simple CFF builder for testing fonts with different Type2 charstrings.
 
-If you just want to "make some fonts", not build tools are necessary.
+If you just want to "make some fonts", no build tools are necessary.
 Simply:
 
 1. clone this repo.
